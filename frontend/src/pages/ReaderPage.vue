@@ -92,21 +92,6 @@
             </div>
           </div>
 
-          <p class="reader-stage__meta">{{ currentChapterMeta }}</p>
-
-          <div class="reader-glass reader-stage__progress-card" @click.stop>
-            <n-progress
-              type="line"
-              :percentage="currentProgressPercent"
-              :show-indicator="false"
-              color="var(--reader-accent)"
-              rail-color="var(--reader-progress-rail)"
-            />
-            <div class="reader-stage__progress-meta">
-              <span>{{ syncedProgressLabel }}</span>
-              <strong>{{ progressPercentLabel }}</strong>
-            </div>
-          </div>
         </section>
 
         <section class="reader-paper">
@@ -129,7 +114,7 @@
             class="reader-content"
             :class="{ 'reader-content--dimmed': chapterLoading }"
           >
-            {{ currentChapter?.content || '正文载入中...' }}
+            {{ currentChapter ? currentChapterBody : '正文载入中...' }}
           </article>
         </section>
 
@@ -289,7 +274,7 @@ import type {
   ReadingProgressPayload,
 } from "../types/api";
 import PageStatusPanel from "../components/PageStatusPanel.vue";
-import { formatNumber, formatPercent } from "../utils/format";
+import { formatPercent } from "../utils/format";
 import { authTokenStorage } from "../utils/token";
 
 const READER_PREFERENCES_KEY = "txt-reader.preferences";
@@ -310,6 +295,11 @@ interface RouteChapterState {
   provided: boolean;
   valid: boolean;
   value: number;
+}
+
+interface ReaderChapterContentView {
+  body: string;
+  trimmedPrefixLength: number;
 }
 
 const DEFAULT_PREFERENCES: ReaderPreferences = {
@@ -372,6 +362,21 @@ const currentChapterTitle = computed(() => {
     "正在载入章节"
   );
 });
+const currentChapterContentView = computed<ReaderChapterContentView>(() => {
+  if (!currentChapter.value) {
+    return {
+      body: "",
+      trimmedPrefixLength: 0,
+    };
+  }
+
+  return buildReaderChapterContentView(
+    currentChapter.value.content,
+    currentChapter.value.chapter_title || currentChapterTitle.value,
+  );
+});
+const currentChapterBody = computed(() => currentChapterContentView.value.body);
+const currentChapterTrimmedPrefixLength = computed(() => currentChapterContentView.value.trimmedPrefixLength);
 const currentChapterPositionLabel = computed(() => {
   if (chapters.value.length === 0) {
     return "暂无目录";
@@ -433,17 +438,6 @@ const syncedProgressLabel = computed(() => {
   }
 
   return `当前进度 ${displayPercent}`;
-});
-const currentChapterMeta = computed(() => {
-  if (!currentChapter.value) {
-    return chapters.value.length > 0 ? `共 ${chapters.value.length} 章` : "章节载入中";
-  }
-
-  const charOffset = sessionProgress.value?.chapter_index === currentChapterIndex.value
-    ? sessionProgress.value.char_offset
-    : 0;
-
-  return `${formatChapterOrdinal(currentChapter.value.chapter_index)} · 范围 ${formatNumber(currentChapter.value.start_offset)} - ${formatNumber(currentChapter.value.end_offset)} · 字符位置 ${formatNumber(charOffset)} · 共 ${chapters.value.length} 章`;
 });
 const canGoPrev = computed(() => currentChapterIndex.value > 0);
 const canGoNext = computed(() => currentChapterIndex.value < chapters.value.length - 1);
@@ -597,6 +591,52 @@ function formatChapterOrdinal(index: number) {
   return `第 ${index + 1} 章`;
 }
 
+function buildReaderChapterContentView(content: string, chapterTitle: string): ReaderChapterContentView {
+  const normalizedContent = content || "";
+  const normalizedTitle = chapterTitle.trim();
+
+  if (!normalizedContent || !normalizedTitle) {
+    return {
+      body: normalizedContent,
+      trimmedPrefixLength: 0,
+    };
+  }
+
+  let cursor = 0;
+  while (cursor < normalizedContent.length && isReaderChapterWhitespace(normalizedContent[cursor])) {
+    cursor += 1;
+  }
+
+  if (!normalizedContent.startsWith(normalizedTitle, cursor)) {
+    return {
+      body: normalizedContent,
+      trimmedPrefixLength: 0,
+    };
+  }
+
+  const bodyOffset = cursor + normalizedTitle.length;
+  if (bodyOffset < normalizedContent.length && !isReaderChapterWhitespace(normalizedContent[bodyOffset])) {
+    return {
+      body: normalizedContent,
+      trimmedPrefixLength: 0,
+    };
+  }
+
+  let bodyStart = bodyOffset;
+  while (bodyStart < normalizedContent.length && isReaderChapterWhitespace(normalizedContent[bodyStart])) {
+    bodyStart += 1;
+  }
+
+  return {
+    body: normalizedContent.slice(bodyStart),
+    trimmedPrefixLength: bodyStart,
+  };
+}
+
+function isReaderChapterWhitespace(character: string) {
+  return /\s/.test(character) || character === "\uFEFF";
+}
+
 function syncViewportState() {
   if (typeof window === "undefined") {
     return;
@@ -702,13 +742,19 @@ function getViewportCharOffset() {
     return 0;
   }
 
+  const renderedLength = currentChapterBody.value.length;
+  if (renderedLength <= 0) {
+    return clamp(currentChapterTrimmedPrefixLength.value, 0, chapterLength);
+  }
+
   const rect = contentRef.value.getBoundingClientRect();
   const elementTop = rect.top + window.scrollY;
   const scrollableHeight = Math.max(contentRef.value.scrollHeight - window.innerHeight * 0.58, 1);
   const focusY = window.scrollY + Math.min(window.innerHeight * 0.32, 220);
   const ratio = clamp((focusY - elementTop) / scrollableHeight, 0, 1);
+  const renderedOffset = Math.round(renderedLength * ratio);
 
-  return Math.round(chapterLength * ratio);
+  return clamp(currentChapterTrimmedPrefixLength.value + renderedOffset, 0, chapterLength);
 }
 
 function captureCurrentProgressSnapshot() {
@@ -740,8 +786,13 @@ async function restoreScrollForCharOffset(charOffset: number, smoothScroll = fal
     return;
   }
 
-  const chapterLength = currentChapter.value.content.length;
-  const ratio = chapterLength > 0 ? clamp(charOffset / chapterLength, 0, 1) : 0;
+  const renderedLength = currentChapterBody.value.length;
+  const adjustedCharOffset = clamp(
+    charOffset - currentChapterTrimmedPrefixLength.value,
+    0,
+    Math.max(renderedLength, 0),
+  );
+  const ratio = renderedLength > 0 ? clamp(adjustedCharOffset / renderedLength, 0, 1) : 0;
   const rect = contentRef.value.getBoundingClientRect();
   const elementTop = rect.top + window.scrollY;
   const scrollableHeight = Math.max(contentRef.value.scrollHeight - window.innerHeight * 0.58, 0);
@@ -1337,7 +1388,6 @@ function goBack() {
 
 .reader-stage__stat span,
 .reader-stage__stat small,
-.reader-stage__meta,
 .reader-inline-nav__hint,
 .reader-drawer__summary p,
 .reader-float__summary {
@@ -1350,19 +1400,6 @@ function goBack() {
   line-height: 1;
 }
 
-.reader-stage__meta {
-  margin: 0;
-  max-width: 70ch;
-  line-height: 1.8;
-}
-
-.reader-stage__progress-card {
-  padding: 16px 18px;
-  display: grid;
-  gap: 12px;
-}
-
-.reader-stage__progress-meta,
 .reader-drawer__summary {
   display: flex;
   justify-content: space-between;
@@ -1370,14 +1407,12 @@ function goBack() {
   align-items: baseline;
 }
 
-.reader-stage__progress-meta span,
 .reader-drawer__summary span,
 .reader-float__stat span {
   color: var(--reader-muted);
   font-size: 13px;
 }
 
-.reader-stage__progress-meta strong,
 .reader-drawer__summary strong,
 .reader-float__stat strong {
   color: var(--reader-heading);
@@ -1665,7 +1700,6 @@ function goBack() {
     grid-template-columns: 1fr 1fr;
   }
 
-  .reader-stage__progress-meta,
   .reader-drawer__summary {
     display: grid;
     gap: 8px;
