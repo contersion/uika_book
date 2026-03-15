@@ -24,6 +24,10 @@ frontend/vite.config.d.ts
 # Runtime data
 backend/data/
 backend/uploads/
+build/
+
+# Project-local AI memory
+.claude/engram/
 
 # Local cache
 .uv-cache/
