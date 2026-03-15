@@ -1,6 +1,6 @@
-﻿<template>
-  <n-layout class="app-layout">
-    <n-layout-header bordered class="app-layout__header">
+<template>
+  <n-layout class="app-layout" :class="{ 'app-layout--immersive': isImmersiveRoute }">
+    <n-layout-header v-if="!isImmersiveRoute" bordered class="app-layout__header">
       <div class="app-layout__brand">
         <div class="app-layout__badge">TXT</div>
         <div>
@@ -34,13 +34,14 @@
       </div>
     </n-layout-header>
 
-    <n-layout-content content-style="padding: 24px;">
+    <n-layout-content class="app-layout__content" :class="{ 'app-layout__content--immersive': isImmersiveRoute }">
       <router-view />
     </n-layout-content>
   </n-layout>
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { NButton, NLayout, NLayoutContent, NLayoutHeader, NSpace } from "naive-ui";
 import { useRoute, useRouter } from "vue-router";
 
@@ -49,6 +50,7 @@ import { useAuthStore } from "../stores/auth";
 const authStore = useAuthStore();
 const route = useRoute();
 const router = useRouter();
+const isImmersiveRoute = computed(() => route.meta.immersive === true);
 
 function goTo(name: "books" | "rules") {
   void router.push({ name });
@@ -63,6 +65,10 @@ function handleLogout() {
 <style scoped>
 .app-layout {
   min-height: 100vh;
+  background: transparent;
+}
+
+.app-layout--immersive {
   background: transparent;
 }
 
@@ -120,9 +126,21 @@ function handleLogout() {
   gap: 12px;
 }
 
+.app-layout__content {
+  padding: 24px;
+}
+
+.app-layout__content--immersive {
+  padding: 0;
+}
+
 .app-layout__username {
+  max-width: min(240px, 40vw);
+  overflow: hidden;
   color: var(--text-secondary);
   font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 780px) {
@@ -136,8 +154,20 @@ function handleLogout() {
     align-items: stretch;
   }
 
+  .app-layout__content {
+    padding: 16px;
+  }
+
+  .app-layout__content--immersive {
+    padding: 0;
+  }
+
   .app-layout__user {
     justify-content: space-between;
+  }
+
+  .app-layout__username {
+    max-width: 100%;
   }
 }
 </style>

@@ -3,6 +3,8 @@ import type {
   BookChapter,
   BookChapterContent,
   BookDetail,
+  BookGroupAssignmentPayload,
+  BookGroupSummary,
   BookReparseResponse,
   BookShelfItem,
   ReadingProgress,
@@ -23,6 +25,12 @@ export const booksApi = {
   },
   chapterContent(bookId: number, chapterIndex: number) {
     return apiClient.get<BookChapterContent>(`/api/books/${bookId}/chapters/${chapterIndex}`);
+  },
+  getGroups(bookId: number) {
+    return apiClient.get<BookGroupSummary[]>(`/api/books/${bookId}/groups`);
+  },
+  updateGroups(bookId: number, payload: BookGroupAssignmentPayload) {
+    return apiClient.put<BookGroupSummary[]>(`/api/books/${bookId}/groups`, payload);
   },
   upload(file: File, chapterRuleId?: number) {
     const formData = new FormData();

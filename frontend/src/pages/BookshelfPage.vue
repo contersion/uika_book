@@ -1,24 +1,960 @@
 ﻿<template>
-  <page-placeholder
-    eyebrow="Bookshelf"
-    title="书架页骨架已准备好"
-    description="这一页后面会接书籍列表、搜索、上传和删除功能。当前先确认：登录后可以进入业务页，基础 layout 和路由已经生效。"
-    :tips="['已接入路由守卫', '已接入 Pinia', 'API 层已预留 books 接口']"
-  >
-    <n-space wrap>
-      <router-link :to="{ name: 'book-detail', params: { bookId: 1 } }">
-        <n-button type="primary">打开占位详情页</n-button>
-      </router-link>
-      <router-link :to="{ name: 'rules' }">
-        <n-button secondary>打开规则管理页</n-button>
-      </router-link>
-    </n-space>
-  </page-placeholder>
+  <div class="bookshelf-page">
+    <header class="bookshelf-page__header">
+      <div class="bookshelf-page__title-wrap">
+        <h1 class="bookshelf-page__title">书架</h1>
+        <span class="bookshelf-page__count">{{ displayedBooks.length }}</span>
+      </div>
+
+      <div class="bookshelf-page__header-actions">
+        <n-button quaternary size="small" :loading="loading" @click="handleRefresh">刷新</n-button>
+        <n-button quaternary size="small" :loading="groupMutationPending" @click="groupManagerVisible = true">
+          分组管理
+        </n-button>
+        <n-button quaternary size="small" @click="toggleEditMode">
+          {{ isEditMode ? "完成" : "编辑" }}
+        </n-button>
+        <n-upload
+          accept=".txt,text/plain"
+          :show-file-list="false"
+          :max="1"
+          :custom-request="handleUpload"
+        >
+          <n-button type="primary" secondary size="small" :loading="uploading">上传 TXT</n-button>
+        </n-upload>
+      </div>
+    </header>
+
+    <section class="bookshelf-page__controls">
+      <div class="bookshelf-page__filter-bar">
+        <div class="bookshelf-page__tabs-wrap">
+          <div class="bookshelf-page__tabs" role="tablist" aria-label="书架分组筛选">
+            <button
+              v-for="filter in filterOptions"
+              :key="filter.key"
+              type="button"
+              class="bookshelf-page__tab"
+              :class="{ 'bookshelf-page__tab--active': activeFilter === filter.key }"
+              :aria-selected="activeFilter === filter.key"
+              @click="activeFilter = filter.key"
+            >
+              {{ filter.label }}
+            </button>
+          </div>
+        </div>
+
+        <div class="bookshelf-page__filter-actions">
+          <div class="bookshelf-page__search">
+            <n-input
+              v-model:value="searchKeyword"
+              clearable
+              size="small"
+              placeholder="搜索书名"
+              @keydown.enter.prevent="handleSearch"
+              @clear="handleClearSearch"
+            />
+            <n-button secondary size="small" :loading="loading" @click="handleSearch">搜索</n-button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <n-alert v-if="errorMessage" type="error" :show-icon="false" class="bookshelf-page__alert">
+      {{ errorMessage }}
+    </n-alert>
+
+    <n-alert v-if="groupWarningMessage" type="warning" :show-icon="false" class="bookshelf-page__alert">
+      {{ groupWarningMessage }}
+    </n-alert>
+
+    <section v-if="loading" class="bookshelf-list bookshelf-list--loading" aria-label="加载中的书架">
+      <article v-for="index in 6" :key="index" class="bookshelf-item bookshelf-item--loading">
+        <div class="bookshelf-item__cover bookshelf-item__cover--loading"></div>
+        <div class="bookshelf-item__body">
+          <n-skeleton text :repeat="3" />
+          <n-skeleton style="margin-top: 8px;" text :repeat="2" />
+          <n-skeleton style="margin-top: 8px;" text :repeat="2" />
+        </div>
+      </article>
+    </section>
+
+    <n-empty v-else-if="displayedBooks.length === 0" :description="emptyDescription" class="bookshelf-page__empty">
+      <template #extra>
+        <span class="bookshelf-page__empty-tip">上传一本 TXT 之后，书架会自动刷新。</span>
+      </template>
+    </n-empty>
+
+    <section v-else class="bookshelf-list" aria-label="书籍列表">
+      <article
+        v-for="book in displayedBooks"
+        :key="book.id"
+        class="bookshelf-item"
+        @click="goToDetail(book.id)"
+      >
+        <div class="bookshelf-item__cover" aria-hidden="true">
+          <span class="bookshelf-item__cover-type">TXT</span>
+          <strong class="bookshelf-item__cover-letter">{{ getCoverLetter(book.title) }}</strong>
+          <span class="bookshelf-item__cover-text">无封面</span>
+        </div>
+
+        <div class="bookshelf-item__body">
+          <div class="bookshelf-item__header-block">
+            <div class="bookshelf-item__title-row">
+              <h2 class="bookshelf-item__title">{{ book.title }}</h2>
+              <span class="bookshelf-item__badge">{{ continueLabel(book) }}</span>
+            </div>
+
+            <div class="bookshelf-item__status-row">
+              <span>{{ formatReadingLabel(book) }}</span>
+              <span>{{ formatRecentLabel(book.last_read_at) }}</span>
+            </div>
+          </div>
+
+          <div class="bookshelf-item__facts">
+            <span>{{ book.author || "作者未填写" }}</span>
+            <span>共 {{ formatNumber(book.total_chapters) }} 章</span>
+            <span>{{ formatWordCount(book.total_words) }}</span>
+            <span>收录于 {{ formatDate(book.updated_at) }}</span>
+          </div>
+
+          <div class="bookshelf-item__groups">
+            <n-tag
+              v-for="group in book.groups"
+              :key="`${book.id}-${group.id}`"
+              size="small"
+              round
+              :bordered="false"
+              type="warning"
+            >
+              {{ group.name }}
+            </n-tag>
+          </div>
+
+          <div class="bookshelf-item__footer">
+            <div class="bookshelf-item__progress">
+              <div class="bookshelf-item__progress-head">
+                <span>阅读进度</span>
+                <strong>{{ formatProgress(book.progress_percent) }}</strong>
+              </div>
+              <n-progress
+                type="line"
+                :percentage="normalizeProgress(book.progress_percent)"
+                :show-indicator="false"
+                :height="6"
+                rail-color="rgba(109, 90, 74, 0.12)"
+                color="var(--primary-color)"
+              />
+            </div>
+
+            <div class="bookshelf-item__actions">
+              <n-button
+                text
+                type="primary"
+                class="bookshelf-item__action bookshelf-item__action--primary"
+                :loading="continuingBookId === book.id"
+                @click.stop="handleContinue(book)"
+              >
+                {{ continueLabel(book) }}
+              </n-button>
+              <n-button quaternary size="small" class="bookshelf-item__action" @click.stop="goToDetail(book.id)">
+                详情
+              </n-button>
+              <n-button quaternary size="small" class="bookshelf-item__action" @click.stop="openBookGroupSelector(book)">
+                管理分组
+              </n-button>
+              <n-popconfirm v-if="isEditMode" @positive-click="() => handleDelete(book)">
+                <template #trigger>
+                  <n-button
+                    quaternary
+                    size="small"
+                    type="error"
+                    class="bookshelf-item__action"
+                    :loading="deletingBookId === book.id"
+                    @click.stop
+                  >
+                    删除
+                  </n-button>
+                </template>
+                删除后将同时移除本地书籍文件，确认继续吗？
+              </n-popconfirm>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <book-group-manager-modal
+      v-model:show="groupManagerVisible"
+      :groups="groups"
+      :busy="groupMutationPending"
+      @create="handleCreateGroup"
+      @rename="handleRenameGroup"
+      @delete="handleDeleteGroup"
+    />
+
+    <book-group-selector-modal
+      v-model:show="groupSelectorVisible"
+      :book-title="managingBook?.title || ''"
+      :groups="groups"
+      :selected-group-ids="selectedGroupIds"
+      :submitting="bookGroupsSubmitting"
+      @submit="handleSubmitBookGroups"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
-import { NButton, NSpace } from "naive-ui";
-import { RouterLink } from "vue-router";
+import { computed, onMounted, ref, watch } from "vue";
+import {
+  NAlert,
+  NButton,
+  NEmpty,
+  NInput,
+  NPopconfirm,
+  NProgress,
+  NSkeleton,
+  NTag,
+  NUpload,
+  useMessage,
+  type UploadCustomRequestOptions,
+} from "naive-ui";
+import { useRouter } from "vue-router";
 
-import PagePlaceholder from "../components/PagePlaceholder.vue";
+import { bookGroupsApi } from "../api/book-groups";
+import { booksApi } from "../api/books";
+import { ApiError, getErrorMessage } from "../api/client";
+import BookGroupManagerModal from "../components/BookGroupManagerModal.vue";
+import BookGroupSelectorModal from "../components/BookGroupSelectorModal.vue";
+import type { BookGroup, BookShelfItem } from "../types/api";
+import { clampPercentage, formatDateTime, formatNumber, formatPercent, formatWordCount } from "../utils/format";
+
+const router = useRouter();
+const message = useMessage();
+const books = ref<BookShelfItem[]>([]);
+const groups = ref<BookGroup[]>([]);
+const searchKeyword = ref("");
+const loading = ref(false);
+const uploading = ref(false);
+const errorMessage = ref<string | null>(null);
+const groupWarningMessage = ref<string | null>(null);
+const deletingBookId = ref<number | null>(null);
+const continuingBookId = ref<number | null>(null);
+const isEditMode = ref(false);
+const activeFilter = ref("all");
+const groupManagerVisible = ref(false);
+const groupSelectorVisible = ref(false);
+const managingBook = ref<BookShelfItem | null>(null);
+const selectedGroupIds = ref<number[]>([]);
+const groupMutationPending = ref(false);
+const bookGroupsSubmitting = ref(false);
+
+const filterOptions = computed(() => {
+  return [
+    { key: "all", label: "全部" },
+    ...groups.value.map((group) => ({ key: `group:${group.id}`, label: group.name })),
+  ];
+});
+
+const displayedBooks = computed(() => {
+  const groupId = getActiveGroupId(activeFilter.value);
+  if (groupId === null) {
+    return books.value;
+  }
+
+  return books.value.filter((book) => book.groups.some((group) => group.id === groupId));
+});
+
+const emptyDescription = computed(() => {
+  if (searchKeyword.value.trim()) {
+    return "没有找到匹配的书籍，试试更短的关键词。";
+  }
+
+  if (getActiveGroupId(activeFilter.value) !== null) {
+    return "当前分组下还没有书籍。";
+  }
+
+  return "书架还是空的，先上传一本 TXT 开始吧。";
+});
+
+watch(groups, (currentGroups) => {
+  const groupId = getActiveGroupId(activeFilter.value);
+  if (groupId === null) {
+    return;
+  }
+
+  if (!currentGroups.some((group) => group.id === groupId)) {
+    activeFilter.value = "all";
+  }
+});
+
+function getActiveGroupId(filterKey: string) {
+  if (!filterKey.startsWith("group:")) {
+    return null;
+  }
+
+  const value = Number(filterKey.slice("group:".length));
+  return Number.isFinite(value) ? value : null;
+}
+
+function normalizeProgress(value: number | null) {
+  return Math.round(clampPercentage(value));
+}
+
+function formatProgress(value: number | null) {
+  return formatPercent(value);
+}
+
+function formatDate(value: string | null) {
+  return formatDateTime(value, "未开始");
+}
+
+function formatRecentLabel(value: string | null) {
+  return value ? `最近阅读 ${formatDateTime(value)}` : "最近阅读：未开始";
+}
+
+function formatReadingLabel(book: BookShelfItem) {
+  const progress = clampPercentage(book.progress_percent);
+  return progress > 0 ? `已读 ${formatPercent(progress)}` : "尚未开始阅读";
+}
+
+function getCoverLetter(title: string) {
+  const normalized = title.trim();
+  return normalized ? normalized.slice(0, 1).toUpperCase() : "T";
+}
+
+function continueLabel(book: BookShelfItem) {
+  return clampPercentage(book.progress_percent) > 0 ? "继续阅读" : "开始阅读";
+}
+
+async function loadBooks(search = searchKeyword.value.trim()) {
+  loading.value = true;
+  errorMessage.value = null;
+
+  try {
+    books.value = await booksApi.list(search || undefined);
+  } catch (error) {
+    books.value = [];
+    errorMessage.value = getErrorMessage(error);
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function loadGroups() {
+  groupWarningMessage.value = null;
+
+  try {
+    groups.value = await bookGroupsApi.list();
+  } catch (error) {
+    groups.value = [];
+    groupWarningMessage.value = getErrorMessage(error);
+  }
+}
+
+async function loadPage() {
+  await Promise.all([loadBooks(searchKeyword.value), loadGroups()]);
+}
+
+function handleSearch() {
+  void loadBooks(searchKeyword.value);
+}
+
+function handleClearSearch() {
+  searchKeyword.value = "";
+  void loadBooks("");
+}
+
+function handleRefresh() {
+  void loadPage();
+}
+
+function toggleEditMode() {
+  isEditMode.value = !isEditMode.value;
+}
+
+function goToDetail(bookId: number) {
+  void router.push({
+    name: "book-detail",
+    params: { bookId },
+  });
+}
+
+async function handleContinue(book: BookShelfItem) {
+  continuingBookId.value = book.id;
+
+  try {
+    const progress = await booksApi.getProgress(book.id);
+    await router.push({
+      name: "reader",
+      params: {
+        bookId: book.id,
+        chapterIndex: progress.chapter_index,
+      },
+    });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      await router.push({
+        name: "reader",
+        params: { bookId: book.id },
+      });
+      return;
+    }
+
+    message.error(getErrorMessage(error));
+  } finally {
+    continuingBookId.value = null;
+  }
+}
+
+async function handleDelete(book: BookShelfItem) {
+  deletingBookId.value = book.id;
+
+  try {
+    await booksApi.delete(book.id);
+    message.success(`已删除《${book.title}》`);
+    await loadBooks(searchKeyword.value);
+    await loadGroups();
+  } catch (error) {
+    message.error(getErrorMessage(error));
+  } finally {
+    deletingBookId.value = null;
+  }
+}
+
+async function handleUpload(options: UploadCustomRequestOptions) {
+  const file = options.file.file;
+
+  if (!(file instanceof File)) {
+    const error = new Error("未找到可上传的文件内容");
+    options.onError?.();
+    message.error(error.message);
+    return;
+  }
+
+  uploading.value = true;
+
+  try {
+    await booksApi.upload(file);
+    options.onFinish?.();
+    message.success(`《${file.name}》上传成功`);
+    await loadPage();
+  } catch (error) {
+    options.onError?.();
+    message.error(getErrorMessage(error));
+  } finally {
+    uploading.value = false;
+  }
+}
+
+async function handleCreateGroup(name: string) {
+  groupMutationPending.value = true;
+
+  try {
+    await bookGroupsApi.create({ name });
+    message.success("分组已创建");
+    await loadGroups();
+  } catch (error) {
+    message.error(getErrorMessage(error));
+  } finally {
+    groupMutationPending.value = false;
+  }
+}
+
+async function handleRenameGroup(payload: { groupId: number; name: string }) {
+  groupMutationPending.value = true;
+
+  try {
+    await bookGroupsApi.update(payload.groupId, { name: payload.name });
+    message.success("分组已重命名");
+    await Promise.all([loadGroups(), loadBooks(searchKeyword.value)]);
+  } catch (error) {
+    message.error(getErrorMessage(error));
+  } finally {
+    groupMutationPending.value = false;
+  }
+}
+
+async function handleDeleteGroup(groupId: number) {
+  groupMutationPending.value = true;
+
+  try {
+    await bookGroupsApi.remove(groupId);
+    message.success("分组已删除");
+    await Promise.all([loadGroups(), loadBooks(searchKeyword.value)]);
+  } catch (error) {
+    message.error(getErrorMessage(error));
+  } finally {
+    groupMutationPending.value = false;
+  }
+}
+
+async function openBookGroupSelector(book: BookShelfItem) {
+  managingBook.value = book;
+  selectedGroupIds.value = book.groups.map((group) => group.id);
+  groupSelectorVisible.value = true;
+
+  try {
+    const currentGroups = await booksApi.getGroups(book.id);
+    selectedGroupIds.value = currentGroups.map((group) => group.id);
+  } catch (error) {
+    message.warning(`未能刷新《${book.title}》的最新分组，先使用当前页面数据。${getErrorMessage(error)}`);
+  }
+}
+
+async function handleSubmitBookGroups(groupIds: number[]) {
+  if (!managingBook.value) {
+    return;
+  }
+
+  bookGroupsSubmitting.value = true;
+
+  try {
+    await booksApi.updateGroups(managingBook.value.id, { group_ids: groupIds });
+    message.success(`已更新《${managingBook.value.title}》的分组`);
+    groupSelectorVisible.value = false;
+    await Promise.all([loadBooks(searchKeyword.value), loadGroups()]);
+  } catch (error) {
+    message.error(getErrorMessage(error));
+  } finally {
+    bookGroupsSubmitting.value = false;
+  }
+}
+
+onMounted(() => {
+  void loadPage();
+});
 </script>
+
+<style scoped>
+.bookshelf-page {
+  width: min(100%, 1720px);
+  margin: 0 auto;
+  display: grid;
+  gap: 22px;
+}
+
+.bookshelf-page__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(109, 90, 74, 0.1);
+}
+
+.bookshelf-page__title-wrap {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.bookshelf-page__title {
+  margin: 0;
+  font-size: clamp(28px, 3vw, 38px);
+  line-height: 1.08;
+}
+
+.bookshelf-page__count {
+  color: var(--text-secondary);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.bookshelf-page__header-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.bookshelf-page__controls {
+  display: grid;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(109, 90, 74, 0.1);
+}
+
+.bookshelf-page__filter-bar {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  min-width: 0;
+}
+
+.bookshelf-page__tabs-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.bookshelf-page__tabs {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.bookshelf-page__tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.bookshelf-page__tab {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.bookshelf-page__tab:hover {
+  color: var(--text-primary);
+  background: rgba(109, 90, 74, 0.08);
+}
+
+.bookshelf-page__tab--active {
+  color: var(--primary-color);
+  background: rgba(184, 93, 54, 0.12);
+  border-color: rgba(184, 93, 54, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(184, 93, 54, 0.06);
+}
+
+.bookshelf-page__filter-actions {
+  flex: 0 0 auto;
+  min-width: clamp(280px, 30vw, 420px);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.bookshelf-page__search {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.bookshelf-page__search :deep(.n-input) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.bookshelf-page__search :deep(.n-button) {
+  flex: 0 0 auto;
+  min-width: 72px;
+  height: 34px;
+  white-space: nowrap;
+}
+
+.bookshelf-page__alert {
+  border-radius: 14px;
+}
+
+.bookshelf-page__empty {
+  padding: 52px 24px;
+  border: 1px solid rgba(109, 90, 74, 0.1);
+  border-radius: 22px;
+  background: rgba(255, 250, 242, 0.78);
+}
+
+.bookshelf-page__empty-tip {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.bookshelf-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  align-items: stretch;
+}
+
+.bookshelf-list--loading {
+  align-items: stretch;
+}
+
+.bookshelf-item {
+  min-width: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding: 18px;
+  border: 1px solid rgba(109, 90, 74, 0.1);
+  border-radius: 20px;
+  background: rgba(255, 252, 247, 0.82);
+  box-shadow: 0 10px 28px rgba(82, 55, 28, 0.06);
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.bookshelf-item:hover {
+  transform: translateY(-2px);
+  border-color: rgba(184, 93, 54, 0.18);
+  box-shadow: 0 18px 34px rgba(82, 55, 28, 0.08);
+}
+
+.bookshelf-item--loading {
+  min-height: 216px;
+}
+
+.bookshelf-item__cover {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 4px;
+  width: 68px;
+  min-height: 94px;
+  padding: 10px 8px;
+  border: 1px solid rgba(109, 90, 74, 0.12);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fffdf8 0%, #f3eadb 100%);
+  color: #6d5a4a;
+}
+
+.bookshelf-item__cover--loading {
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.bookshelf-item__cover-type {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--primary-color);
+}
+
+.bookshelf-item__cover-letter {
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.bookshelf-item__cover-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.bookshelf-item__body {
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bookshelf-item__header-block {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.bookshelf-item__title-row {
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+  align-items: start;
+}
+
+.bookshelf-item__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.bookshelf-item__badge {
+  flex-shrink: 0;
+  margin-top: 2px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(184, 93, 54, 0.1);
+  color: var(--primary-color);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bookshelf-item__status-row,
+.bookshelf-item__facts,
+.bookshelf-item__progress-head span {
+  color: var(--text-secondary);
+}
+
+.bookshelf-item__status-row {
+  display: flex;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.bookshelf-item__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  font-size: 13px;
+}
+
+.bookshelf-item__facts span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookshelf-item__groups {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bookshelf-item__footer {
+  margin-top: auto;
+  display: grid;
+  gap: 12px;
+}
+
+.bookshelf-item__progress {
+  display: grid;
+  gap: 8px;
+}
+
+.bookshelf-item__progress-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 12px;
+}
+
+.bookshelf-item__progress-head strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.bookshelf-item__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.bookshelf-item__action {
+  min-width: 0;
+}
+
+.bookshelf-item__action--primary {
+  font-weight: 600;
+}
+
+@media (max-width: 1240px) {
+  .bookshelf-list {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+
+  .bookshelf-page__filter-actions {
+    min-width: 320px;
+  }
+}
+
+@media (max-width: 980px) {
+  .bookshelf-page {
+    gap: 18px;
+  }
+
+  .bookshelf-page__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bookshelf-page__filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .bookshelf-page__filter-actions {
+    min-width: 0;
+  }
+
+  .bookshelf-page__search {
+    width: 100%;
+  }
+
+  .bookshelf-list {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
+  .bookshelf-item {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 720px) {
+  .bookshelf-page {
+    gap: 16px;
+  }
+
+  .bookshelf-list {
+    grid-template-columns: 1fr;
+  }
+
+  .bookshelf-item {
+    grid-template-columns: 62px minmax(0, 1fr);
+    gap: 14px;
+    padding: 14px;
+  }
+
+  .bookshelf-item__cover {
+    width: 62px;
+    min-height: 88px;
+  }
+
+  .bookshelf-item__title {
+    font-size: 17px;
+    -webkit-line-clamp: 3;
+  }
+
+  .bookshelf-item__facts {
+    grid-template-columns: 1fr;
+  }
+
+  .bookshelf-page__tabs {
+    gap: 8px;
+  }
+
+  .bookshelf-page__tab {
+    min-height: 36px;
+    padding: 0 14px;
+  }
+}
+</style>

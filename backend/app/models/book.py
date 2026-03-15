@@ -4,6 +4,7 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.models.book_group_membership import book_group_memberships
 from app.models.mixins import utcnow
 
 
@@ -44,3 +45,9 @@ class Book(Base):
         back_populates="book",
         cascade="all, delete-orphan",
     )
+    groups: Mapped[list["BookGroup"]] = relationship(
+        secondary=book_group_memberships,
+        back_populates="books",
+        order_by="BookGroup.name",
+    )
+

@@ -5,7 +5,9 @@ from app.core.database import get_db
 from app.core.dependencies import CurrentUser
 from app.schemas.book import BookDetail, BookRead, BookReparseRequest, BookReparseResponse, BookShelfItem
 from app.schemas.book_chapter import BookChapterContent, BookChapterRead, BookChapterSummary
+from app.schemas.book_group import BookGroupAssignmentUpdate, BookGroupSummary
 from app.schemas.reading_progress import ReadingProgressRead, ReadingProgressSyncRequest
+from app.services.book_groups import BookGroupError
 from app.services.books import (
     BookChapterNotFoundError,
     BookDeleteError,
@@ -15,12 +17,15 @@ from app.services.books import (
     BookUploadError,
     create_uploaded_book,
     delete_user_book,
-    get_user_book_detail,
+    get_book_display_title,
     get_user_book_chapter,
+    get_user_book_detail,
     list_user_book_chapters,
+    list_user_book_groups,
     list_user_books,
     read_book_chapter_content,
     reparse_user_book,
+    update_user_book_groups,
 )
 from app.services.reading_progress import ReadingProgressNotFoundError, get_user_reading_progress, upsert_user_reading_progress
 
@@ -69,7 +74,36 @@ def get_book(book_id: int, current_user: CurrentUser, db: Session = Depends(get_
     except BookNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    return BookDetail.model_validate(book)
+    payload = BookDetail.model_validate(book).model_dump()
+    payload["title"] = get_book_display_title(book.file_name, book.title)
+    return BookDetail.model_validate(payload)
+
+
+@router.get("/{book_id}/groups", response_model=list[BookGroupSummary])
+def get_book_groups(book_id: int, current_user: CurrentUser, db: Session = Depends(get_db)) -> list[BookGroupSummary]:
+    try:
+        groups = list_user_book_groups(db, current_user.id, book_id)
+    except BookNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    return [BookGroupSummary.model_validate(group) for group in groups]
+
+
+@router.put("/{book_id}/groups", response_model=list[BookGroupSummary])
+def put_book_groups(
+    book_id: int,
+    payload: BookGroupAssignmentUpdate,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> list[BookGroupSummary]:
+    try:
+        groups = update_user_book_groups(db, current_user.id, book_id, payload.group_ids)
+    except BookNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except BookGroupError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    return [BookGroupSummary.model_validate(group) for group in groups]
 
 
 @router.post("/{book_id}/reparse", response_model=BookReparseResponse)
@@ -168,3 +202,4 @@ def get_book_chapter(
             "content": content,
         }
     )
+

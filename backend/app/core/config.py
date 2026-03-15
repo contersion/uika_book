@@ -1,9 +1,10 @@
 ﻿from functools import lru_cache
 import json
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -16,7 +17,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     api_v1_prefix: str = "/api/v1"
-    cors_origins: list[str] = Field(
+    cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: [
             "http://localhost:5173",
             "http://127.0.0.1:5173",
@@ -46,8 +47,13 @@ class Settings(BaseSettings):
             if not value:
                 return []
             if value.startswith("["):
-                return json.loads(value)
+                parsed = json.loads(value)
+                if not isinstance(parsed, list):
+                    raise ValueError("cors_origins JSON value must be a list")
+                return [str(item).strip() for item in parsed if str(item).strip()]
             return [item.strip() for item in value.split(",") if item.strip()]
+        if isinstance(value, (list, tuple, set)):
+            return [str(item).strip() for item in value if str(item).strip()]
         return value
 
     @field_validator("data_dir", "upload_dir", mode="before")

@@ -1,10 +1,16 @@
-﻿export interface ApiErrorResponse {
-  success: false;
-  detail: string;
-  error: {
-    code: string;
+﻿export interface ApiFieldError {
+  loc: Array<string | number>;
+  msg: string;
+  type: string;
+}
+
+export interface ApiErrorResponse {
+  success?: false;
+  detail?: string | ApiFieldError[];
+  error?: {
+    code?: string;
     message: string;
-    details: unknown;
+    details?: unknown;
   };
 }
 
@@ -52,14 +58,35 @@ export interface ChapterRuleTestPayload {
   flags: string;
 }
 
+export interface ChapterRuleTestMatchItem {
+  text: string;
+  start: number;
+  end: number;
+}
+
 export interface ChapterRuleTestResponse {
   matched: boolean;
   count: number;
-  items: Array<{
-    text: string;
-    start: number;
-    end: number;
-  }>;
+  items: ChapterRuleTestMatchItem[];
+}
+
+export interface BookGroupSummary {
+  id: number;
+  name: string;
+}
+
+export interface BookGroup extends BookGroupSummary {
+  book_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BookGroupPayload {
+  name: string;
+}
+
+export interface BookGroupAssignmentPayload {
+  group_ids: number[];
 }
 
 export interface BookShelfItem {
@@ -72,6 +99,7 @@ export interface BookShelfItem {
   progress_percent: number | null;
   created_at: string;
   updated_at: string;
+  groups: BookGroupSummary[];
 }
 
 export interface BookDetail {
@@ -89,6 +117,7 @@ export interface BookDetail {
   created_at: string;
   updated_at: string;
   chapter_rule?: ChapterRule | null;
+  groups: BookGroupSummary[];
 }
 
 export interface BookChapter {
@@ -127,14 +156,16 @@ export interface ReadingProgressPayload {
   updated_at: string;
 }
 
+export interface BookReparseChapterSummary {
+  chapter_index: number;
+  chapter_title: string;
+  start_offset: number;
+  end_offset: number;
+}
+
 export interface BookReparseResponse {
   book_id: number;
   chapter_rule_id: number;
   total_chapters: number;
-  chapters: Array<{
-    chapter_index: number;
-    chapter_title: string;
-    start_offset: number;
-    end_offset: number;
-  }>;
+  chapters: BookReparseChapterSummary[];
 }

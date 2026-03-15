@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.core.security import get_password_hash
 from app.models import User
 from app.services.auth import get_user_by_username
+from app.services.book_groups import ensure_all_user_book_groups
 from app.services.chapter_rules import seed_builtin_rules
 from app.utils.files import ensure_directory
 
@@ -41,8 +42,9 @@ def verify_database_connection() -> None:
 
 def run_seeders() -> None:
     seeders: tuple[Seeder, ...] = (
-        _seed_builtin_chapter_rules,
         _seed_default_user,
+        _seed_builtin_chapter_rules,
+        _seed_book_groups,
     )
     with database.session_scope() as session:
         for seeder in seeders:
@@ -57,10 +59,6 @@ def init_db() -> None:
     run_seeders()
 
 
-def _seed_builtin_chapter_rules(session: Session) -> None:
-    seed_builtin_rules(session)
-
-
 def _seed_default_user(session: Session) -> None:
     existing_user = get_user_by_username(session, settings.default_admin_username)
     if existing_user is None:
@@ -70,7 +68,17 @@ def _seed_default_user(session: Session) -> None:
                 password_hash=get_password_hash(settings.default_admin_password),
             )
         )
+        session.flush()
+
+
+def _seed_builtin_chapter_rules(session: Session) -> None:
+    seed_builtin_rules(session)
+
+
+def _seed_book_groups(session: Session) -> None:
+    ensure_all_user_book_groups(session)
 
 
 def bootstrap_application() -> None:
     init_db()
+

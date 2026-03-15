@@ -120,7 +120,7 @@ def create_rule(db: Session, user: User, payload: ChapterRuleCreate) -> ChapterR
         is_default=False,
     )
     db.add(rule)
-    db.flush()
+    _flush_or_raise(db)
 
     if payload.is_default:
         set_rule_as_default(db, user.id, rule)
@@ -207,6 +207,14 @@ def _update_builtin_rule(db: Session, user_id: int, rule: ChapterRule, payload: 
             set_rule_as_default(db, user_id, rule)
         else:
             rule.is_default = False
+
+
+def _flush_or_raise(db: Session) -> None:
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        raise ChapterRuleError("Chapter rule name already exists") from exc
 
 
 def _commit_or_raise(db: Session) -> None:

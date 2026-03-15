@@ -1,6 +1,8 @@
-﻿# OS / editor
+# OS / editor
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/
 
 # Python
 __pycache__/
@@ -25,6 +27,14 @@ backend/uploads/
 
 # Local cache
 .uv-cache/
+
+# Logs / temp files
+*.log
+frontend/.vite-dev.err
+frontend/.vite-dev.log
+
+# Docker overrides
+/docker-compose.override.yml
 
 # Env files
 .env

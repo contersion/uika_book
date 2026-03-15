@@ -15,6 +15,8 @@ EXPECTED_TABLES = {
     "book_chapters",
     "reading_progress",
     "chapter_rules",
+    "book_groups",
+    "book_group_memberships",
 }
 
 
@@ -93,3 +95,4 @@ def test_init_db_creates_all_application_tables(monkeypatch, tmp_path):
 
     inspector = inspect(database.engine)
     assert EXPECTED_TABLES.issubset(set(inspector.get_table_names()))
+

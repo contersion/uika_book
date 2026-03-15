@@ -3,6 +3,7 @@
 from pydantic import Field
 
 from app.schemas.book_chapter import BookChapterSummary
+from app.schemas.book_group import BookGroupSummary
 from app.schemas.chapter_rule import ChapterRuleRead
 from app.schemas.common import ORMModel
 
@@ -44,6 +45,7 @@ class BookRead(BookBase):
     file_path: str
     created_at: datetime
     updated_at: datetime
+    groups: list[BookGroupSummary] = Field(default_factory=list)
 
 
 class BookShelfItem(ORMModel):
@@ -56,6 +58,7 @@ class BookShelfItem(ORMModel):
     progress_percent: float | None = None
     created_at: datetime
     updated_at: datetime
+    groups: list[BookGroupSummary] = Field(default_factory=list)
 
 
 class BookDetail(BookRead):
@@ -67,3 +70,4 @@ class BookReparseResponse(ORMModel):
     chapter_rule_id: int
     total_chapters: int
     chapters: list[BookChapterSummary]
+

@@ -1,4 +1,4 @@
-﻿from contextlib import contextmanager
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -100,13 +100,13 @@ def test_get_books_returns_bookshelf_and_supports_search(monkeypatch, tmp_path):
         update_book_author(first_book["id"], "Liu Cixin")
         create_progress(user_id, first_book["id"], 37.5)
 
-        response = client.get("/api/books", params={"search": "\u4e09\u4f53"})
+        response = client.get("/api/books", params={"search": "book-one"})
 
     assert response.status_code == 200
     payload = response.json()
     assert len(payload) == 1
     assert payload[0]["id"] == first_book["id"]
-    assert payload[0]["title"] == "\u4e09\u4f53"
+    assert payload[0]["title"] == "book-one"
     assert payload[0]["author"] == "Liu Cixin"
     assert payload[0]["total_chapters"] == 2
     assert payload[0]["total_words"] == len("".join(BOOK_ONE_TEXT.split()))
@@ -123,7 +123,7 @@ def test_get_book_detail_returns_book_and_chapter_rule(monkeypatch, tmp_path):
     assert response.status_code == 200
     payload = response.json()
     assert payload["id"] == book["id"]
-    assert payload["title"] == "\u4e09\u4f53"
+    assert payload["title"] == "detail"
     assert payload["chapter_rule_id"] is not None
     assert payload["chapter_rule"]["id"] == payload["chapter_rule_id"]
     assert payload["chapter_rule"]["rule_name"] == "\u4e2d\u6587\u7ae0\u8282\u89c4\u5219"

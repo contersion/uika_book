@@ -1,6 +1,7 @@
 ﻿from app.schemas.auth import LoginRequest, TokenResponse
 from app.schemas.book import BookCreate, BookDetail, BookRead, BookReparseRequest, BookReparseResponse, BookShelfItem, BookUpdate
 from app.schemas.book_chapter import BookChapterContent, BookChapterCreate, BookChapterRead, BookChapterSummary
+from app.schemas.book_group import BookGroupAssignmentUpdate, BookGroupCreate, BookGroupRead, BookGroupSummary, BookGroupUpdate
 from app.schemas.chapter_rule import ChapterRuleCreate, ChapterRuleRead, ChapterRuleUpdate
 from app.schemas.common import ORMModel
 from app.schemas.health import HealthResponse
@@ -27,6 +28,11 @@ __all__ = [
     "BookChapterRead",
     "BookChapterSummary",
     "BookChapterContent",
+    "BookGroupCreate",
+    "BookGroupRead",
+    "BookGroupSummary",
+    "BookGroupUpdate",
+    "BookGroupAssignmentUpdate",
     "ReadingProgressCreate",
     "ReadingProgressRead",
     "ReadingProgressSyncRequest",
@@ -38,3 +44,4 @@ __all__ = [
     "RuleTestResponse",
     "RuleTestItem",
 ]
+

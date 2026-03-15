@@ -1,15 +1,17 @@
 ﻿import re
+from collections.abc import Sequence
 from pathlib import Path
 import uuid
 from types import SimpleNamespace
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
-from app.models import Book, BookChapter, ChapterRule, ReadingProgress, User
+from app.models import Book, BookChapter, BookGroup, ChapterRule, ReadingProgress, User
 from app.services.book_chapters import replace_book_chapters, save_book_chapters
+from app.services.book_groups import BookGroupError, ensure_default_group, get_user_groups_by_ids
 from app.services.chapter_rules import get_default_rule, get_visible_rule
 from app.services.chapter_splitter import ChapterSegment, split_book_into_chapters
 from app.utils.encoding import EncodingDetectionError, detect_text_encoding
@@ -47,6 +49,7 @@ class BookReparseError(BookAccessError):
 def list_user_books(db: Session, user_id: int, search: str | None = None) -> list[dict[str, object]]:
     statement = (
         select(Book, ReadingProgress)
+        .options(selectinload(Book.groups))
         .outerjoin(
             ReadingProgress,
             and_(ReadingProgress.book_id == Book.id, ReadingProgress.user_id == user_id),
@@ -55,13 +58,13 @@ def list_user_books(db: Session, user_id: int, search: str | None = None) -> lis
         .order_by(Book.updated_at.desc())
     )
     if search and search.strip():
-        statement = statement.where(Book.title.contains(search.strip()))
+        statement = statement.where(or_(Book.title.contains(search.strip()), Book.file_name.contains(search.strip())))
 
-    rows = db.execute(statement).all()
+    rows = db.execute(statement).unique().all()
     return [
         {
             "id": book.id,
-            "title": book.title,
+            "title": get_book_display_title(book.file_name, book.title),
             "author": book.author,
             "total_chapters": book.total_chapters,
             "total_words": book.total_words,
@@ -69,13 +72,18 @@ def list_user_books(db: Session, user_id: int, search: str | None = None) -> lis
             "progress_percent": progress.percent if progress is not None else None,
             "created_at": book.created_at,
             "updated_at": book.updated_at,
+            "groups": _serialize_book_groups(book.groups),
         }
         for book, progress in rows
     ]
 
 
-def get_user_book(db: Session, user_id: int, book_id: int) -> Book:
-    statement = select(Book).where(Book.id == book_id, Book.user_id == user_id)
+def get_user_book(db: Session, user_id: int, book_id: int, *, load_groups: bool = False) -> Book:
+    statement = select(Book)
+    if load_groups:
+        statement = statement.options(selectinload(Book.groups))
+
+    statement = statement.where(Book.id == book_id, Book.user_id == user_id)
     book = db.execute(statement).scalar_one_or_none()
     if book is None:
         raise BookNotFoundError("Book not found")
@@ -85,7 +93,7 @@ def get_user_book(db: Session, user_id: int, book_id: int) -> Book:
 def get_user_book_detail(db: Session, user_id: int, book_id: int) -> Book:
     statement = (
         select(Book)
-        .options(selectinload(Book.chapter_rule))
+        .options(selectinload(Book.chapter_rule), selectinload(Book.groups))
         .where(Book.id == book_id, Book.user_id == user_id)
     )
     book = db.execute(statement).scalar_one_or_none()
@@ -114,6 +122,30 @@ def get_user_book_chapter(db: Session, user_id: int, book_id: int, chapter_index
     if chapter is None:
         raise BookChapterNotFoundError("Chapter not found")
     return book, chapter
+
+
+def list_user_book_groups(db: Session, user_id: int, book_id: int) -> list[BookGroup]:
+    book = get_user_book(db, user_id, book_id, load_groups=True)
+    return list(book.groups)
+
+
+def update_user_book_groups(db: Session, user_id: int, book_id: int, group_ids: Sequence[int]) -> list[BookGroup]:
+    normalized_group_ids = _normalize_group_ids(group_ids)
+    if not normalized_group_ids:
+        raise BookGroupError("Book must belong to at least one group")
+
+    book = get_user_book(db, user_id, book_id, load_groups=True)
+    groups = get_user_groups_by_ids(db, user_id, normalized_group_ids)
+    book.groups = groups
+
+    try:
+        db.commit()
+        db.refresh(book)
+    except IntegrityError as exc:
+        db.rollback()
+        raise BookGroupError("Failed to update book groups") from exc
+
+    return list(book.groups)
 
 
 def read_book_text(book: Book) -> str:
@@ -199,6 +231,7 @@ def create_uploaded_book(
         raise BookUploadError(str(exc)) from exc
 
     chapter_rule = _resolve_chapter_rule(db, user.id, chapter_rule_id)
+    default_group = ensure_default_group(db, user.id)
 
     book_uuid = uuid.uuid4().hex
     raw_dir = settings.upload_dir / "raw" / str(user.id)
@@ -215,7 +248,7 @@ def create_uploaded_book(
 
     book = Book(
         user_id=user.id,
-        title=_detect_title(text, Path(original_file_name).stem),
+        title=get_book_display_title(original_file_name, Path(original_file_name).stem),
         author=None,
         description=None,
         file_name=original_file_name,
@@ -229,6 +262,7 @@ def create_uploaded_book(
     try:
         db.add(book)
         db.flush()
+        book.groups.append(default_group)
 
         chapter_segments = _split_book_content(text, chapter_rule)
         save_book_chapters(db, book, chapter_segments)
@@ -246,6 +280,15 @@ def create_uploaded_book(
         raw_path.unlink(missing_ok=True)
         normalized_path.unlink(missing_ok=True)
         raise BookUploadError("Failed to save uploaded book") from exc
+
+
+def get_book_display_title(file_name: str, fallback: str | None = None) -> str:
+    stem = Path(file_name or "").stem.strip()
+    if stem:
+        return stem
+    if fallback and fallback.strip():
+        return fallback.strip()
+    return "uploaded"
 
 
 def _resolve_chapter_rule(db: Session, user_id: int, chapter_rule_id: int | None) -> ChapterRule | None:
@@ -276,21 +319,15 @@ def _sanitize_filename(filename: str) -> str:
     return sanitized or "uploaded.txt"
 
 
-def _detect_title(text: str, fallback: str) -> str:
-    chapter_pattern = re.compile(r"^\s*(第\s*[0-9零〇一二两三四五六七八九十百千万]+\s*[章节回篇卷]|chapter\s+\d+)", re.IGNORECASE)
-    for line in text.splitlines()[:20]:
-        candidate = line.strip().strip("\ufeff")
-        if not candidate:
-            continue
-        if len(candidate) > 80:
-            continue
-        if chapter_pattern.match(candidate):
-            continue
-        if candidate.lower().startswith(("作者:", "作者：", "author:", "author：")):
-            continue
-        return candidate.strip("《》") or fallback
-    return fallback
-
-
 def _count_text_units(text: str) -> int:
     return len(re.sub(r"\s+", "", text))
+
+
+def _normalize_group_ids(group_ids: Sequence[int]) -> list[int]:
+    return list(dict.fromkeys(int(group_id) for group_id in group_ids))
+
+
+def _serialize_book_groups(groups: Sequence[BookGroup]) -> list[dict[str, object]]:
+    return [{"id": group.id, "name": group.name} for group in groups]
+
+

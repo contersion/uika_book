@@ -4,20 +4,26 @@ import App from "./App.vue";
 import { router } from "./router";
 import { useAuthStore } from "./stores/auth";
 import { pinia } from "./stores";
+import { installGlobalErrorHandling, notifyGlobalError } from "./utils/app-notifier";
 import "./styles/index.css";
 
-async function bootstrap() {
-  const app = createApp(App);
+installGlobalErrorHandling();
 
-  app.use(pinia);
+const app = createApp(App);
 
-  const authStore = useAuthStore(pinia);
-  await authStore.ensureReady();
+app.config.errorHandler = (error) => {
+  notifyGlobalError(error, "页面渲染出现异常，请刷新后重试");
+  console.error(error);
+};
 
-  app.use(router);
-  await router.isReady();
+router.onError((error) => {
+  notifyGlobalError(error, "页面跳转失败，请稍后重试");
+});
 
-  app.mount("#app");
-}
+app.use(pinia);
 
-bootstrap();
+const authStore = useAuthStore(pinia);
+void authStore.ensureReady();
+
+app.use(router);
+app.mount("#app");

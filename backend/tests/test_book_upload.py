@@ -1,4 +1,4 @@
-﻿from contextlib import contextmanager
+from contextlib import contextmanager
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -119,7 +119,7 @@ def test_upload_txt_creates_book_saves_files_and_parses_chapters(monkeypatch, tm
 
     assert response.status_code == 201
     payload = response.json()
-    assert payload["title"] == "\u4e09\u4f53"
+    assert payload["title"] == "three-body"
     assert payload["file_name"] == "three-body.txt"
     assert payload["encoding"] == "utf-8"
     assert payload["chapter_rule_id"] == default_rule_id
@@ -159,7 +159,7 @@ def test_upload_txt_supports_gbk_and_explicit_chapter_rule(monkeypatch, tmp_path
 
     assert response.status_code == 201
     payload = response.json()
-    assert payload["title"] == "\u6211\u7684\u5c0f\u8bf4"
+    assert payload["title"] == "novel"
     assert payload["encoding"] == "utf-8"
     assert payload["chapter_rule_id"] == builtin_rule_id
 

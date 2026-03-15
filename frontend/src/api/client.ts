@@ -1,7 +1,7 @@
 ﻿import { authTokenStorage } from "../utils/token";
 import type { ApiErrorResponse } from "../types/api";
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
 
 type QueryValue = string | number | boolean | null | undefined;
 type RequestBody = BodyInit | FormData | URLSearchParams | object | null | undefined;
@@ -30,7 +30,7 @@ interface RequestOptions {
 }
 
 function isApiErrorResponse(payload: unknown): payload is ApiErrorResponse {
-  return typeof payload === "object" && payload !== null && "error" in payload && "detail" in payload;
+  return typeof payload === "object" && payload !== null && ("error" in payload || "detail" in payload);
 }
 
 function isRawBody(body: RequestBody): body is BodyInit {
@@ -41,6 +41,20 @@ function isRawBody(body: RequestBody): body is BodyInit {
     body instanceof URLSearchParams ||
     body instanceof ArrayBuffer
   );
+}
+
+function formatErrorDetail(detail: ApiErrorResponse["detail"]) {
+  if (typeof detail === "string" && detail.trim()) {
+    return detail;
+  }
+
+  if (Array.isArray(detail) && detail.length > 0) {
+    return detail
+      .map((item) => item.msg || "请求参数不合法")
+      .join("；");
+  }
+
+  return "请求失败，请稍后再试";
 }
 
 function buildUrl(path: string, query?: Record<string, QueryValue>) {
@@ -83,21 +97,38 @@ async function request<T>(path: string, options: RequestOptions = {}) {
     payload = JSON.stringify(body);
   }
 
-  const response = await fetch(buildUrl(path, query), {
-    method,
-    headers: requestHeaders,
-    body: payload,
-    signal,
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(buildUrl(path, query), {
+      method,
+      headers: requestHeaders,
+      body: payload,
+      signal,
+    });
+  } catch (error) {
+    const message = error instanceof DOMException && error.name === "AbortError"
+      ? "请求已取消"
+      : "无法连接到后端服务，请确认后端已启动";
+
+    throw new ApiError(message, 0, "NETWORK_ERROR", error);
+  }
 
   const contentType = response.headers.get("content-type") || "";
-  const data = contentType.includes("application/json")
-    ? await response.json()
-    : await response.text();
+  const data = response.status === 204
+    ? undefined
+    : contentType.includes("application/json")
+      ? await response.json()
+      : await response.text();
 
   if (!response.ok) {
     if (isApiErrorResponse(data)) {
-      throw new ApiError(data.error.message, response.status, data.error.code, data.error.details);
+      const message = data.error?.message || formatErrorDetail(data.detail);
+      throw new ApiError(message, response.status, data.error?.code, data.error?.details ?? data.detail);
+    }
+
+    if (typeof data === "string" && data.trim()) {
+      throw new ApiError(data, response.status, undefined, data);
     }
 
     throw new ApiError(response.statusText || "请求失败", response.status, undefined, data);

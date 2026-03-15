@@ -1,4 +1,4 @@
-﻿import { createRouter, createWebHistory } from "vue-router";
+import { createRouter, createWebHistory } from "vue-router";
 
 import AppLayout from "../layouts/AppLayout.vue";
 import BookDetailPage from "../pages/BookDetailPage.vue";
@@ -63,6 +63,7 @@ const router = createRouter({
           }),
           meta: {
             title: "阅读页",
+            immersive: true,
           },
         },
         {
