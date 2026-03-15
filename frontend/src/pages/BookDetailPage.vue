@@ -38,7 +38,10 @@
           <h1 class="detail-hero__title">{{ book.title }}</h1>
           <p class="detail-hero__author">{{ book.author || "作者未填写" }}</p>
           <p class="detail-hero__description">
-            {{ book.description || "这本书还没有补充描述，当前可直接查看目录、继续阅读或切换目录规则后重新解析。" }}
+            {{
+              book.description ||
+              "这本书还没有补充描述，你可以先查看目录、继续阅读，或切换目录规则后重新解析。"
+            }}
           </p>
 
           <div class="detail-hero__tags">
@@ -54,6 +57,9 @@
             </n-button>
             <n-button secondary size="large" @click="goToChapter(0)">
               从第一章开始
+            </n-button>
+            <n-button tertiary size="large" @click="openCatalog">
+              查看目录
             </n-button>
           </div>
         </div>
@@ -126,32 +132,13 @@
         </n-card>
       </section>
 
-      <n-card :bordered="false" class="detail-card detail-card--chapters">
-        <template #header>
-          <span class="detail-card__heading">目录列表</span>
-        </template>
-        <template #header-extra>
-          <span class="detail-card__subheading">共 {{ chapters.length }} 章</span>
-        </template>
-
-        <n-empty v-if="chapters.length === 0" description="当前没有可展示的章节目录。" />
-
-        <div v-else class="chapter-list">
-          <button
-            v-for="chapter in chapters"
-            :key="chapter.id"
-            type="button"
-            class="chapter-list__item"
-            @click="goToChapter(chapter.chapter_index)"
-          >
-            <span class="chapter-list__index">第 {{ chapter.chapter_index + 1 }} 章</span>
-            <strong class="chapter-list__title">{{ chapter.chapter_title }}</strong>
-            <span class="chapter-list__meta">
-              范围 {{ formatNumber(chapter.start_offset) }} - {{ formatNumber(chapter.end_offset) }}
-            </span>
-          </button>
-        </div>
-      </n-card>
+      <chapter-catalog-modal-drawer
+        v-model:show="catalogVisible"
+        :book-title="book.title"
+        :chapter-count="book.total_chapters"
+        :chapters="chapters"
+        @select="handleCatalogSelect"
+      />
     </template>
   </div>
 </template>
@@ -162,7 +149,6 @@ import {
   NAlert,
   NButton,
   NCard,
-  NEmpty,
   NSelect,
   NSkeleton,
   NTag,
@@ -173,8 +159,9 @@ import { useRouter } from "vue-router";
 import { booksApi } from "../api/books";
 import { chapterRulesApi } from "../api/chapter-rules";
 import { ApiError, getErrorMessage } from "../api/client";
-import type { BookChapter, BookDetail, ChapterRule, ReadingProgress } from "../types/api";
+import ChapterCatalogModalDrawer from "../components/ChapterCatalogModalDrawer.vue";
 import PageStatusPanel from "../components/PageStatusPanel.vue";
+import type { BookChapter, BookDetail, ChapterRule, ReadingProgress } from "../types/api";
 import { formatDateTime, formatNumber, formatWordCount } from "../utils/format";
 
 const props = defineProps<{
@@ -193,6 +180,7 @@ const pageError = ref<string | null>(null);
 const rulesError = ref<string | null>(null);
 const readingPending = ref(false);
 const reparsePending = ref(false);
+const catalogVisible = ref(false);
 
 const ruleOptions = computed(() => {
   return rules.value.map((rule) => ({
@@ -216,7 +204,7 @@ const currentRuleDescription = computed(() => {
   }
 
   const selectedRule = rules.value.find((rule) => rule.id === selectedRuleId.value);
-  return selectedRule?.description || "你可以在这里切换规则并重新解析目录。";
+  return selectedRule?.description || "你可以在这里切换规则，并重新解析当前书籍的目录。";
 });
 
 const readActionLabel = computed(() => {
@@ -228,7 +216,7 @@ const progressTagLabel = computed(() => {
     return "尚未开始";
   }
 
-  return `上次读到第 ${progress.value.chapter_index + 1} 章`;
+  return `上次读到第 ${formatNumber(progress.value.chapter_index + 1)} 章`;
 });
 
 function formatDate(value: string) {
@@ -318,6 +306,15 @@ function goToChapter(chapterIndex: number) {
   });
 }
 
+function openCatalog() {
+  catalogVisible.value = true;
+}
+
+function handleCatalogSelect(chapterIndex: number) {
+  catalogVisible.value = false;
+  goToChapter(chapterIndex);
+}
+
 async function handleReadAction() {
   readingPending.value = true;
 
@@ -355,6 +352,7 @@ async function handleReparse() {
 watch(
   () => props.bookId,
   () => {
+    catalogVisible.value = false;
     void loadPage();
   },
   { immediate: true },
@@ -379,8 +377,7 @@ watch(
   font-size: 13px;
 }
 
-.book-detail-page__loading,
-.book-detail-page__error-state {
+.book-detail-page__loading {
   display: grid;
   gap: 18px;
 }
@@ -505,11 +502,6 @@ watch(
   font-weight: 700;
 }
 
-.detail-card__subheading {
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
 .detail-info-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -587,49 +579,6 @@ watch(
   gap: 12px;
 }
 
-.detail-card--chapters :deep(.n-card__content) {
-  display: grid;
-  gap: 14px;
-}
-
-.chapter-list {
-  display: grid;
-  gap: 10px;
-}
-
-.chapter-list__item {
-  width: 100%;
-  display: grid;
-  gap: 6px;
-  padding: 16px 18px;
-  border: 0;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.58);
-  text-align: left;
-  cursor: pointer;
-  transition:
-    transform 160ms ease,
-    box-shadow 160ms ease,
-    background 160ms ease;
-}
-
-.chapter-list__item:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 14px 28px rgba(82, 55, 28, 0.08);
-  background: rgba(255, 255, 255, 0.78);
-}
-
-.chapter-list__index,
-.chapter-list__meta {
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.chapter-list__title {
-  font-size: 16px;
-  line-height: 1.6;
-}
-
 @media (max-width: 960px) {
   .detail-hero,
   .detail-grid {
@@ -646,8 +595,8 @@ watch(
   .detail-hero__actions,
   .detail-rule-card__actions,
   .detail-info-grid {
-    grid-template-columns: 1fr;
     display: grid;
+    grid-template-columns: 1fr;
   }
 }
 </style>

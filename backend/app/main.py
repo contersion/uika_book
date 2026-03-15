@@ -17,11 +17,15 @@ async def lifespan(_: FastAPI):
 
 
 def create_application() -> FastAPI:
+    docs_enabled = settings.debug
     application = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
         debug=settings.debug,
         lifespan=lifespan,
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        openapi_url="/openapi.json" if docs_enabled else None,
     )
     application.add_middleware(
         CORSMiddleware,
