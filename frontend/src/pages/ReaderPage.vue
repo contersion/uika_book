@@ -116,30 +116,27 @@
           >
             {{ currentChapter ? currentChapterBody : '正文载入中...' }}
           </article>
-        </section>
-
-        <section
-          class="reader-glass reader-inline-nav"
-          :class="{ 'reader-inline-nav--visible': shouldShowChrome }"
-          @click.stop
-        >
-          <p class="reader-inline-nav__hint">
-            阅读进度会在切章时立即保存，滚动阅读时约 15 秒自动同步一次，关闭页面前也会尝试再保存一次。
-          </p>
-
-          <div class="reader-inline-nav__actions">
-            <n-button size="large" :disabled="!canGoPrev || chapterLoading" @click="handlePrevChapter">
-              上一章
-            </n-button>
-            <n-button
-              type="primary"
-              size="large"
-              :disabled="!canGoNext || chapterLoading"
-              @click="handleNextChapter"
-            >
-              下一章
-            </n-button>
-          </div>
+          <section v-if="isCompactViewport" class="reader-paper__chapter-nav" @click.stop>
+            <div class="reader-paper__chapter-actions">
+              <n-button
+                block
+                size="large"
+                :disabled="!canGoPrev || chapterLoading"
+                @click="handlePrevChapter"
+              >
+                上一章
+              </n-button>
+              <n-button
+                block
+                type="primary"
+                size="large"
+                :disabled="!canGoNext || chapterLoading"
+                @click="handleNextChapter"
+              >
+                下一章
+              </n-button>
+            </div>
+          </section>
         </section>
       </main>
 
@@ -1388,7 +1385,6 @@ function goBack() {
 
 .reader-stage__stat span,
 .reader-stage__stat small,
-.reader-inline-nav__hint,
 .reader-drawer__summary p,
 .reader-float__summary {
   color: var(--reader-muted);
@@ -1441,24 +1437,16 @@ function goBack() {
   gap: 12px;
 }
 
-.reader-inline-nav {
-  width: min(100%, var(--reader-column-width));
-  max-width: var(--reader-column-width);
-  margin: 0 auto 24px;
-  padding: 18px 20px;
+.reader-paper__chapter-nav {
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid color-mix(in srgb, var(--reader-paper-border) 88%, transparent);
+}
+
+.reader-paper__chapter-actions {
   display: grid;
-  gap: 14px;
-}
-
-.reader-inline-nav__hint {
-  margin: 0;
-  line-height: 1.7;
-}
-
-.reader-inline-nav__actions {
-  display: flex;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  flex-wrap: wrap;
 }
 
 .reader-float__panel {
@@ -1615,8 +1603,7 @@ function goBack() {
   }
 
   .reader-stage__hero,
-  .reader-paper,
-  .reader-inline-nav {
+  .reader-paper {
     width: auto;
     max-width: none;
   }
@@ -1636,7 +1623,7 @@ function goBack() {
 
   .reader-paper {
     margin: 0 10px;
-    padding: 26px 20px 120px;
+    padding: 26px 20px 30px;
     border-radius: 30px;
   }
 
@@ -1663,27 +1650,6 @@ function goBack() {
     pointer-events: auto;
     transform: translateY(0);
   }
-
-  .reader-inline-nav {
-    position: fixed;
-    left: 14px;
-    right: 14px;
-    bottom: max(14px, env(safe-area-inset-bottom));
-    z-index: 30;
-    margin: 0;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(18px);
-    transition:
-      opacity 180ms ease,
-      transform 180ms ease;
-  }
-
-  .reader-inline-nav--visible {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateY(0);
-  }
 }
 
 @media (max-width: 720px) {
@@ -1693,11 +1659,6 @@ function goBack() {
 
   .reader-content {
     max-width: none;
-  }
-
-  .reader-inline-nav__actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
   }
 
   .reader-drawer__summary {
