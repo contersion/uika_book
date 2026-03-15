@@ -23,8 +23,8 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
-      - backend_data:/app/data
-      - backend_uploads:/app/uploads
+      - ./backend/data:/app/data
+      - ./backend/uploads:/app/uploads
 
   frontend:
     build:
@@ -38,7 +38,4 @@ services:
     ports:
       - "${FRONTEND_PORT:-5173}:80"
 
-volumes:
-  backend_data:
-  backend_uploads:
 
