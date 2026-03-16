@@ -34,6 +34,22 @@ function resolveApiBaseUrl() {
 
 export const API_BASE_URL = resolveApiBaseUrl();
 
+export function resolveApiAssetUrl(path: string | null | undefined) {
+  if (!path) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  if (path.startsWith("/")) {
+    return API_BASE_URL ? `${API_BASE_URL}${path}` : path;
+  }
+
+  return API_BASE_URL ? `${API_BASE_URL}/${path}` : `/${path}`;
+}
+
 type QueryValue = string | number | boolean | null | undefined;
 type RequestBody = BodyInit | FormData | URLSearchParams | object | null | undefined;
 
@@ -52,7 +68,7 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions {
-  method?: "GET" | "POST" | "PUT" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   query?: Record<string, QueryValue>;
   body?: RequestBody;
   headers?: HeadersInit;
@@ -192,6 +208,9 @@ export const apiClient = {
   },
   put<T>(path: string, body?: RequestOptions["body"], options?: Omit<RequestOptions, "method" | "body">) {
     return request<T>(path, { ...options, method: "PUT", body });
+  },
+  patch<T>(path: string, body?: RequestOptions["body"], options?: Omit<RequestOptions, "method" | "body">) {
+    return request<T>(path, { ...options, method: "PATCH", body });
   },
   delete<T>(path: string, options?: Omit<RequestOptions, "method" | "body">) {
     return request<T>(path, { ...options, method: "DELETE" });

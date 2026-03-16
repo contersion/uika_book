@@ -45,6 +45,14 @@
         </div>
 
         <div class="bookshelf-page__filter-actions">
+          <n-select
+            v-model:value="sortKey"
+            size="small"
+            class="bookshelf-page__sort"
+            :options="sortOptions"
+            :consistent-menu-width="false"
+          />
+
           <div class="bookshelf-page__search">
             <n-input
               v-model:value="searchKeyword"
@@ -81,7 +89,7 @@
 
     <n-empty v-else-if="displayedBooks.length === 0" :description="emptyDescription" class="bookshelf-page__empty">
       <template #extra>
-        <span class="bookshelf-page__empty-tip">上传一本 TXT 之后，书架会自动刷新。</span>
+        <span class="bookshelf-page__empty-tip">上传一本 TXT 后，书架会自动刷新。</span>
       </template>
     </n-empty>
 
@@ -92,10 +100,19 @@
         class="bookshelf-item"
         @click="goToDetail(book.id)"
       >
-        <div class="bookshelf-item__cover" aria-hidden="true">
-          <span class="bookshelf-item__cover-type">TXT</span>
-          <strong class="bookshelf-item__cover-letter">{{ getCoverLetter(book.title) }}</strong>
-          <span class="bookshelf-item__cover-text">无封面</span>
+        <div class="bookshelf-item__cover" :class="{ 'bookshelf-item__cover--filled': !!book.cover_url }" aria-hidden="true">
+          <img
+            v-if="resolveCover(book.cover_url)"
+            class="bookshelf-item__cover-image"
+            :src="resolveCover(book.cover_url) || undefined"
+            :alt="`${book.title} 封面`"
+            loading="lazy"
+          />
+          <template v-else>
+            <span class="bookshelf-item__cover-type">TXT</span>
+            <strong class="bookshelf-item__cover-letter">{{ getCoverLetter(book.title) }}</strong>
+            <span class="bookshelf-item__cover-text">无封面</span>
+          </template>
         </div>
 
         <div class="bookshelf-item__body">
@@ -107,7 +124,7 @@
 
             <div class="bookshelf-item__status-row">
               <span>{{ formatReadingLabel(book) }}</span>
-              <span>{{ formatRecentLabel(book.last_read_at) }}</span>
+              <span>{{ formatRecentLabel(book.recent_read_at ?? book.last_read_at) }}</span>
             </div>
           </div>
 
@@ -115,7 +132,7 @@
             <span>{{ book.author || "作者未填写" }}</span>
             <span>共 {{ formatNumber(book.total_chapters) }} 章</span>
             <span>{{ formatWordCount(book.total_words) }}</span>
-            <span>收录于 {{ formatDate(book.updated_at) }}</span>
+            <span>收录于 {{ formatDate(book.created_at) }}</span>
           </div>
 
           <div class="bookshelf-item__groups">
@@ -205,7 +222,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   NAlert,
   NButton,
@@ -213,25 +230,27 @@ import {
   NInput,
   NPopconfirm,
   NProgress,
+  NSelect,
   NSkeleton,
   NTag,
   NUpload,
   useMessage,
-  type UploadInst,
   type UploadCustomRequestOptions,
+  type UploadInst,
 } from "naive-ui";
 import { useRouter } from "vue-router";
 
 import { bookGroupsApi } from "../api/book-groups";
 import { booksApi } from "../api/books";
-import { ApiError, getErrorMessage } from "../api/client";
+import { resolveApiAssetUrl, ApiError, getErrorMessage } from "../api/client";
 import BookGroupManagerModal from "../components/BookGroupManagerModal.vue";
 import BookGroupSelectorModal from "../components/BookGroupSelectorModal.vue";
-import type { BookGroup, BookShelfItem } from "../types/api";
+import type { BookGroup, BookShelfItem, BookSortKey } from "../types/api";
 import { clampPercentage, formatDateTime, formatNumber, formatPercent, formatWordCount } from "../utils/format";
 
 const router = useRouter();
 const message = useMessage();
+const BOOK_METADATA_UPDATED_EVENT = "books:metadata-updated";
 const uploadRef = ref<UploadInst | null>(null);
 const books = ref<BookShelfItem[]>([]);
 const groups = ref<BookGroup[]>([]);
@@ -244,12 +263,19 @@ const deletingBookId = ref<number | null>(null);
 const continuingBookId = ref<number | null>(null);
 const isEditMode = ref(false);
 const activeFilter = ref("all");
+const sortKey = ref<BookSortKey>("created_at");
 const groupManagerVisible = ref(false);
 const groupSelectorVisible = ref(false);
 const managingBook = ref<BookShelfItem | null>(null);
 const selectedGroupIds = ref<number[]>([]);
 const groupMutationPending = ref(false);
 const bookGroupsSubmitting = ref(false);
+
+const sortOptions = [
+  { label: "按收录时间", value: "created_at" },
+  { label: "按最近阅读", value: "recent_read" },
+  { label: "按书名", value: "title" },
+] satisfies Array<{ label: string; value: BookSortKey }>;
 
 const filterOptions = computed(() => {
   return [
@@ -258,14 +284,7 @@ const filterOptions = computed(() => {
   ];
 });
 
-const displayedBooks = computed(() => {
-  const groupId = getActiveGroupId(activeFilter.value);
-  if (groupId === null) {
-    return books.value;
-  }
-
-  return books.value.filter((book) => book.groups.some((group) => group.id === groupId));
-});
+const displayedBooks = computed(() => books.value);
 
 const emptyDescription = computed(() => {
   if (searchKeyword.value.trim()) {
@@ -290,6 +309,14 @@ watch(groups, (currentGroups) => {
   }
 });
 
+watch(activeFilter, () => {
+  void loadBooks(searchKeyword.value);
+});
+
+watch(sortKey, () => {
+  void loadBooks(searchKeyword.value);
+});
+
 function getActiveGroupId(filterKey: string) {
   if (!filterKey.startsWith("group:")) {
     return null;
@@ -308,7 +335,7 @@ function formatProgress(value: number | null) {
 }
 
 function formatDate(value: string | null) {
-  return formatDateTime(value, "未开始");
+  return formatDateTime(value, "时间未知");
 }
 
 function formatRecentLabel(value: string | null) {
@@ -329,6 +356,10 @@ function continueLabel(book: BookShelfItem) {
   return clampPercentage(book.progress_percent) > 0 ? "继续阅读" : "开始阅读";
 }
 
+function resolveCover(coverUrl: string | null) {
+  return resolveApiAssetUrl(coverUrl);
+}
+
 function resetUploadControl() {
   uploadRef.value?.clear();
 }
@@ -338,7 +369,11 @@ async function loadBooks(search = searchKeyword.value.trim()) {
   errorMessage.value = null;
 
   try {
-    books.value = await booksApi.list(search || undefined);
+    books.value = await booksApi.list({
+      search: search || undefined,
+      groupId: getActiveGroupId(activeFilter.value),
+      sort: sortKey.value,
+    });
   } catch (error) {
     books.value = [];
     errorMessage.value = getErrorMessage(error);
@@ -419,8 +454,7 @@ async function handleDelete(book: BookShelfItem) {
   try {
     await booksApi.delete(book.id);
     message.success(`已删除《${book.title}》`);
-    await loadBooks(searchKeyword.value);
-    await loadGroups();
+    await Promise.all([loadBooks(searchKeyword.value), loadGroups()]);
   } catch (error) {
     message.error(getErrorMessage(error));
   } finally {
@@ -529,8 +563,22 @@ async function handleSubmitBookGroups(groupIds: number[]) {
   }
 }
 
+function handleMetadataUpdated() {
+  void loadBooks(searchKeyword.value);
+}
+
 onMounted(() => {
+  if (typeof window !== "undefined") {
+    window.addEventListener(BOOK_METADATA_UPDATED_EVENT, handleMetadataUpdated);
+  }
+
   void loadPage();
+});
+
+onUnmounted(() => {
+  if (typeof window !== "undefined") {
+    window.removeEventListener(BOOK_METADATA_UPDATED_EVENT, handleMetadataUpdated);
+  }
 });
 </script>
 
@@ -651,9 +699,16 @@ onMounted(() => {
 
 .bookshelf-page__filter-actions {
   flex: 0 0 auto;
-  min-width: clamp(280px, 30vw, 420px);
+  min-width: clamp(340px, 34vw, 520px);
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
+  align-items: center;
+}
+
+.bookshelf-page__sort {
+  width: 138px;
+  flex: 0 0 auto;
 }
 
 .bookshelf-page__search {
@@ -733,6 +788,7 @@ onMounted(() => {
 }
 
 .bookshelf-item__cover {
+  position: relative;
   display: grid;
   justify-items: center;
   align-content: center;
@@ -744,10 +800,24 @@ onMounted(() => {
   border-radius: 14px;
   background: linear-gradient(180deg, #fffdf8 0%, #f3eadb 100%);
   color: #6d5a4a;
+  overflow: hidden;
+}
+
+.bookshelf-item__cover--filled {
+  padding: 0;
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .bookshelf-item__cover--loading {
   background: rgba(255, 255, 255, 0.82);
+}
+
+.bookshelf-item__cover-image {
+  width: 100%;
+  height: 100%;
+  min-height: 94px;
+  object-fit: cover;
+  display: block;
 }
 
 .bookshelf-item__cover-type {
@@ -912,6 +982,11 @@ onMounted(() => {
 
   .bookshelf-page__filter-actions {
     min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .bookshelf-page__sort {
+    width: 100%;
   }
 
   .bookshelf-page__search {
@@ -943,7 +1018,8 @@ onMounted(() => {
     padding: 14px;
   }
 
-  .bookshelf-item__cover {
+  .bookshelf-item__cover,
+  .bookshelf-item__cover-image {
     width: 62px;
     min-height: 88px;
   }
@@ -964,6 +1040,11 @@ onMounted(() => {
   .bookshelf-page__tab {
     min-height: 36px;
     padding: 0 14px;
+  }
+
+  .bookshelf-page__filter-actions {
+    display: grid;
+    gap: 10px;
   }
 }
 </style>

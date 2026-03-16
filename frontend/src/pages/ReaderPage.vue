@@ -81,6 +81,7 @@
 
           <div class="reader-stage__header">
             <div>
+              <p v-if="bookTitle" class="reader-stage__book">{{ bookTitle }}</p>
               <p class="reader-stage__chapter">{{ currentChapterPositionLabel }}</p>
               <h1 class="reader-stage__title">{{ currentChapterTitle }}</h1>
             </div>
@@ -318,10 +319,12 @@ const props = withDefaults(
 const route = useRoute();
 const router = useRouter();
 const chapters = ref<BookChapter[]>([]);
+const bookTitle = ref("");
 const progress = ref<ReadingProgress | null>(null);
 const sessionProgress = ref<ProgressSnapshot | null>(null);
 const currentChapter = ref<BookChapterContent | null>(null);
 const currentChapterIndex = ref(0);
+const hasMeaningfulReadingActivity = ref(false);
 const loading = ref(true);
 const chapterLoading = ref(false);
 const pageError = ref<string | null>(null);
@@ -772,6 +775,7 @@ function syncSessionProgressFromViewport() {
     return;
   }
 
+  hasMeaningfulReadingActivity.value = true;
   sessionProgress.value = snapshot;
   scheduleProgressSync();
 }
@@ -814,22 +818,34 @@ async function loadProgressSafely(bookId: number) {
   }
 }
 
+async function loadBookDetailSafely(bookId: number) {
+  try {
+    return await booksApi.detail(bookId);
+  } catch {
+    return null;
+  }
+}
+
 async function loadReader() {
   loading.value = true;
   pageError.value = null;
   chapterError.value = null;
   activeDrawer.value = null;
   mobileChromeVisible.value = !isCompactViewport.value;
+  bookTitle.value = "";
   sessionProgress.value = null;
+  hasMeaningfulReadingActivity.value = false;
   syncState.value = "idle";
   clearScheduledProgressSync();
 
   try {
-    const [chapterList, latestProgress] = await Promise.all([
+    const [bookDetail, chapterList, latestProgress] = await Promise.all([
+      loadBookDetailSafely(props.bookId),
       booksApi.chapters(props.bookId),
       loadProgressSafely(props.bookId),
     ]);
 
+    bookTitle.value = bookDetail?.title || "";
     chapters.value = chapterList;
     progress.value = latestProgress;
     lastSavedProgressKey = latestProgress ? getProgressKey(latestProgress) : "";
@@ -862,6 +878,7 @@ async function loadReader() {
       restoreCharOffset,
     });
   } catch (error) {
+    bookTitle.value = "";
     chapters.value = [];
     progress.value = null;
     sessionProgress.value = null;
@@ -1009,6 +1026,7 @@ async function openChapter(
     await restoreScrollForCharOffset(restoreCharOffset, !!options.smoothScroll);
 
     if (options.saveAfterOpen && sessionProgress.value) {
+      hasMeaningfulReadingActivity.value = true;
       await flushProgress("chapter-change", {
         snapshot: sessionProgress.value,
         force: true,
@@ -1046,6 +1064,10 @@ function handleWindowScroll() {
 }
 
 function handlePageHide() {
+  if (!hasMeaningfulReadingActivity.value) {
+    return;
+  }
+
   void flushProgress("pagehide", {
     keepalive: true,
     force: true,
@@ -1368,6 +1390,14 @@ function goBack() {
   font-size: 14px;
 }
 
+.reader-stage__book {
+  margin: 0 0 8px;
+  color: var(--reader-muted);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .reader-stage__title {
   margin: 10px 0 0;
   color: var(--reader-heading);
@@ -1667,4 +1697,3 @@ function goBack() {
   }
 }
 </style>
-

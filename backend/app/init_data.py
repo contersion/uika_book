@@ -1,7 +1,7 @@
-﻿from collections.abc import Callable
+from collections.abc import Callable
 from pathlib import Path
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 - ensure model modules are imported before create_all
@@ -22,6 +22,7 @@ def ensure_runtime_directories() -> dict[str, Path]:
     directories = {
         "data_dir": ensure_directory(settings.data_dir),
         "upload_dir": ensure_directory(settings.upload_dir),
+        "cover_dir": ensure_directory(settings.upload_dir / "covers"),
     }
 
     database_path = database.engine.url.database
@@ -33,6 +34,7 @@ def ensure_runtime_directories() -> dict[str, Path]:
 
 def create_database_schema() -> None:
     database.Base.metadata.create_all(bind=database.engine)
+    _apply_sqlite_compat_migrations()
 
 
 def verify_database_connection() -> None:
@@ -82,3 +84,21 @@ def _seed_book_groups(session: Session) -> None:
 def bootstrap_application() -> None:
     init_db()
 
+
+def _apply_sqlite_compat_migrations() -> None:
+    inspector = inspect(database.engine)
+    if "books" not in inspector.get_table_names():
+        return
+
+    existing_columns = {column["name"] for column in inspector.get_columns("books")}
+    statements: list[str] = []
+
+    if "cover_path" not in existing_columns:
+        statements.append("ALTER TABLE books ADD COLUMN cover_path VARCHAR(500)")
+
+    if not statements:
+        return
+
+    with database.engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))

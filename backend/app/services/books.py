@@ -1,10 +1,11 @@
-﻿import re
-from collections.abc import Sequence
-from pathlib import Path
+import re
 import uuid
+from collections.abc import Sequence
+from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -46,7 +47,32 @@ class BookReparseError(BookAccessError):
     pass
 
 
-def list_user_books(db: Session, user_id: int, search: str | None = None) -> list[dict[str, object]]:
+class BookCoverError(BookAccessError):
+    pass
+
+
+BOOK_SORT_CREATED_AT = "created_at"
+BOOK_SORT_RECENT_READ = "recent_read"
+BOOK_SORT_TITLE = "title"
+DEFAULT_BOOK_SORT = BOOK_SORT_CREATED_AT
+ALLOWED_BOOK_SORTS = {BOOK_SORT_CREATED_AT, BOOK_SORT_RECENT_READ, BOOK_SORT_TITLE}
+COVER_URL_PREFIX = "/media/covers"
+ALLOWED_COVER_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+ALLOWED_COVER_CONTENT_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+
+
+def list_user_books(
+    db: Session,
+    user_id: int,
+    search: str | None = None,
+    group_id: int | None = None,
+    sort: str = DEFAULT_BOOK_SORT,
+) -> list[dict[str, object]]:
     statement = (
         select(Book, ReadingProgress)
         .options(selectinload(Book.groups))
@@ -55,27 +81,14 @@ def list_user_books(db: Session, user_id: int, search: str | None = None) -> lis
             and_(ReadingProgress.book_id == Book.id, ReadingProgress.user_id == user_id),
         )
         .where(Book.user_id == user_id)
-        .order_by(Book.updated_at.desc())
     )
+    if group_id is not None:
+        statement = statement.join(Book.groups).where(BookGroup.id == group_id, BookGroup.user_id == user_id)
     if search and search.strip():
         statement = statement.where(or_(Book.title.contains(search.strip()), Book.file_name.contains(search.strip())))
 
-    rows = db.execute(statement).unique().all()
-    return [
-        {
-            "id": book.id,
-            "title": get_book_display_title(book.file_name, book.title),
-            "author": book.author,
-            "total_chapters": book.total_chapters,
-            "total_words": book.total_words,
-            "last_read_at": progress.updated_at if progress is not None else None,
-            "progress_percent": progress.percent if progress is not None else None,
-            "created_at": book.created_at,
-            "updated_at": book.updated_at,
-            "groups": _serialize_book_groups(book.groups),
-        }
-        for book, progress in rows
-    ]
+    rows = db.execute(_apply_book_sort(statement, sort)).unique().all()
+    return [_serialize_bookshelf_item(book, progress) for book, progress in rows]
 
 
 def get_user_book(db: Session, user_id: int, book_id: int, *, load_groups: bool = False) -> Book:
@@ -90,16 +103,21 @@ def get_user_book(db: Session, user_id: int, book_id: int, *, load_groups: bool 
     return book
 
 
-def get_user_book_detail(db: Session, user_id: int, book_id: int) -> Book:
+def get_user_book_detail(db: Session, user_id: int, book_id: int) -> dict[str, object]:
     statement = (
-        select(Book)
+        select(Book, ReadingProgress)
         .options(selectinload(Book.chapter_rule), selectinload(Book.groups))
+        .outerjoin(
+            ReadingProgress,
+            and_(ReadingProgress.book_id == Book.id, ReadingProgress.user_id == user_id),
+        )
         .where(Book.id == book_id, Book.user_id == user_id)
     )
-    book = db.execute(statement).scalar_one_or_none()
-    if book is None:
+    row = db.execute(statement).unique().one_or_none()
+    if row is None:
         raise BookNotFoundError("Book not found")
-    return book
+    book, progress = row
+    return _serialize_book_detail(book, progress)
 
 
 def list_user_book_chapters(db: Session, user_id: int, book_id: int) -> list[BookChapter]:
@@ -148,6 +166,37 @@ def update_user_book_groups(db: Session, user_id: int, book_id: int, group_ids: 
     return list(book.groups)
 
 
+def update_user_book_metadata(
+    db: Session,
+    user_id: int,
+    book_id: int,
+    *,
+    title: str | None | object = None,
+    author: str | None | object = None,
+    description: str | None | object = None,
+    fields_to_update: set[str] | None = None,
+) -> dict[str, object]:
+    book = get_user_book(db, user_id, book_id)
+    fields_to_update = fields_to_update or set()
+
+    if "title" in fields_to_update:
+        normalized_title = _normalize_optional_text(title)
+        if normalized_title:
+            book.title = normalized_title
+    if "author" in fields_to_update:
+        book.author = _normalize_optional_text(author)
+    if "description" in fields_to_update:
+        book.description = _normalize_optional_text(description)
+
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise BookUploadError("Failed to update book metadata") from exc
+
+    return get_user_book_detail(db, user_id, book_id)
+
+
 def read_book_text(book: Book) -> str:
     try:
         return Path(book.file_path).read_text(encoding=book.encoding)
@@ -165,6 +214,60 @@ def read_book_chapter_content(book: Book, chapter: BookChapter) -> str:
     start_offset = max(0, min(chapter.start_offset, text_length))
     end_offset = max(start_offset, min(chapter.end_offset, text_length))
     return text[start_offset:end_offset]
+
+
+def upload_user_book_cover(
+    db: Session,
+    user_id: int,
+    book_id: int,
+    *,
+    filename: str,
+    raw_bytes: bytes,
+    content_type: str | None,
+) -> dict[str, object]:
+    if not raw_bytes:
+        raise BookCoverError("Uploaded cover is empty")
+
+    book = get_user_book(db, user_id, book_id)
+    cover_suffix = _resolve_cover_suffix(filename, content_type)
+    cover_dir = settings.upload_dir / "covers" / str(user_id)
+    cover_dir.mkdir(parents=True, exist_ok=True)
+
+    previous_cover_path = Path(book.cover_path) if book.cover_path else None
+    new_cover_path = cover_dir / f"{book.id}_{uuid.uuid4().hex}{cover_suffix}"
+
+    try:
+        new_cover_path.write_bytes(raw_bytes)
+    except OSError as exc:
+        raise BookCoverError(f"Failed to save uploaded cover: {exc}") from exc
+
+    try:
+        book.cover_path = str(new_cover_path)
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        new_cover_path.unlink(missing_ok=True)
+        raise BookCoverError("Failed to save uploaded cover") from exc
+
+    if previous_cover_path is not None and previous_cover_path != new_cover_path:
+        previous_cover_path.unlink(missing_ok=True)
+
+    return get_user_book_detail(db, user_id, book_id)
+
+
+def delete_user_book_cover(db: Session, user_id: int, book_id: int) -> None:
+    book = get_user_book(db, user_id, book_id)
+    cover_path = Path(book.cover_path) if book.cover_path else None
+    book.cover_path = None
+
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise BookCoverError("Failed to delete book cover") from exc
+
+    if cover_path is not None:
+        cover_path.unlink(missing_ok=True)
 
 
 def delete_user_book(db: Session, user_id: int, book_id: int) -> None:
@@ -248,9 +351,10 @@ def create_uploaded_book(
 
     book = Book(
         user_id=user.id,
-        title=get_book_display_title(original_file_name, Path(original_file_name).stem),
+        title=_derive_book_title(original_file_name),
         author=None,
         description=None,
+        cover_path=None,
         file_name=original_file_name,
         file_path=str(normalized_path),
         encoding=settings.default_txt_encoding,
@@ -282,12 +386,17 @@ def create_uploaded_book(
         raise BookUploadError("Failed to save uploaded book") from exc
 
 
-def get_book_display_title(file_name: str, fallback: str | None = None) -> str:
+def get_book_display_title(title: str | None, file_name: str | None = None) -> str:
+    if title and title.strip():
+        return title.strip()
+
     stem = Path(file_name or "").stem.strip()
     if stem:
         return stem
-    if fallback and fallback.strip():
-        return fallback.strip()
+
+    if file_name and file_name.strip():
+        return file_name.strip()
+
     return "uploaded"
 
 
@@ -311,7 +420,8 @@ def _collect_book_file_paths(book: Book) -> list[Path]:
     normalized_path = Path(book.file_path)
     raw_dir = settings.upload_dir / "raw" / str(book.user_id)
     raw_paths = list(raw_dir.glob(f"{normalized_path.stem}_*"))
-    return [normalized_path, *raw_paths]
+    cover_paths = [Path(book.cover_path)] if book.cover_path else []
+    return [normalized_path, *raw_paths, *cover_paths]
 
 
 def _sanitize_filename(filename: str) -> str:
@@ -331,3 +441,103 @@ def _serialize_book_groups(groups: Sequence[BookGroup]) -> list[dict[str, object
     return [{"id": group.id, "name": group.name} for group in groups]
 
 
+def _apply_book_sort(statement, sort: str):
+    normalized_sort = sort if sort in ALLOWED_BOOK_SORTS else DEFAULT_BOOK_SORT
+
+    if normalized_sort == BOOK_SORT_TITLE:
+        return statement.order_by(func.lower(Book.title).asc(), Book.created_at.desc(), Book.id.desc())
+
+    if normalized_sort == BOOK_SORT_RECENT_READ:
+        unread_last = case((ReadingProgress.updated_at.is_(None), 1), else_=0)
+        return statement.order_by(
+            unread_last.asc(),
+            ReadingProgress.updated_at.desc(),
+            Book.created_at.desc(),
+            Book.id.desc(),
+        )
+
+    return statement.order_by(Book.created_at.desc(), Book.id.desc())
+
+
+def _serialize_bookshelf_item(book: Book, progress: ReadingProgress | None) -> dict[str, object]:
+    recent_read_at = _ensure_utc_datetime(progress.updated_at) if progress is not None else None
+    return {
+        "id": book.id,
+        "title": get_book_display_title(book.title, book.file_name),
+        "author": book.author,
+        "total_chapters": book.total_chapters,
+        "total_words": book.total_words,
+        "last_read_at": recent_read_at,
+        "recent_read_at": recent_read_at,
+        "progress_percent": progress.percent if progress is not None else None,
+        "cover_url": _build_cover_url(book.cover_path),
+        "created_at": book.created_at,
+        "updated_at": book.updated_at,
+        "groups": _serialize_book_groups(book.groups),
+    }
+
+
+def _serialize_book_detail(book: Book, progress: ReadingProgress | None) -> dict[str, object]:
+    return {
+        "id": book.id,
+        "user_id": book.user_id,
+        "title": get_book_display_title(book.title, book.file_name),
+        "author": book.author,
+        "description": book.description,
+        "encoding": book.encoding,
+        "total_words": book.total_words,
+        "total_chapters": book.total_chapters,
+        "chapter_rule_id": book.chapter_rule_id,
+        "file_name": book.file_name,
+        "file_path": book.file_path,
+        "cover_url": _build_cover_url(book.cover_path),
+        "created_at": book.created_at,
+        "updated_at": book.updated_at,
+        "recent_read_at": _ensure_utc_datetime(progress.updated_at) if progress is not None else None,
+        "progress_percent": progress.percent if progress is not None else None,
+        "groups": _serialize_book_groups(book.groups),
+        "chapter_rule": book.chapter_rule,
+    }
+
+
+def _normalize_optional_text(value: str | None | object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+def _derive_book_title(file_name: str) -> str:
+    stem = Path(file_name or "").stem.strip()
+    return stem or "uploaded"
+
+
+def _resolve_cover_suffix(filename: str, content_type: str | None) -> str:
+    normalized_content_type = (content_type or "").strip().lower()
+    if normalized_content_type in ALLOWED_COVER_CONTENT_TYPES:
+        return ALLOWED_COVER_CONTENT_TYPES[normalized_content_type]
+
+    suffix = Path(filename or "").suffix.lower()
+    if suffix in ALLOWED_COVER_SUFFIXES:
+        return suffix
+
+    raise BookCoverError("Only jpg, jpeg, png, and webp cover images are supported")
+
+
+def _build_cover_url(cover_path: str | None) -> str | None:
+    if not cover_path:
+        return None
+
+    cover_root = (settings.upload_dir / "covers").resolve()
+    absolute_cover_path = Path(cover_path).resolve()
+    try:
+        relative_path = absolute_cover_path.relative_to(cover_root).as_posix()
+    except ValueError:
+        return None
+    return f"{COVER_URL_PREFIX}/{relative_path}"
+
+
+def _ensure_utc_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)

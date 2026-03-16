@@ -1,15 +1,23 @@
-﻿from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser
-from app.schemas.book import BookDetail, BookRead, BookReparseRequest, BookReparseResponse, BookShelfItem
+from app.schemas.book import (
+    BookDetail,
+    BookMetadataUpdate,
+    BookRead,
+    BookReparseRequest,
+    BookReparseResponse,
+    BookShelfItem,
+)
 from app.schemas.book_chapter import BookChapterContent, BookChapterRead, BookChapterSummary
 from app.schemas.book_group import BookGroupAssignmentUpdate, BookGroupSummary
 from app.schemas.reading_progress import ReadingProgressRead, ReadingProgressSyncRequest
 from app.services.book_groups import BookGroupError
 from app.services.books import (
     BookChapterNotFoundError,
+    BookCoverError,
     BookDeleteError,
     BookNotFoundError,
     BookReadError,
@@ -17,7 +25,7 @@ from app.services.books import (
     BookUploadError,
     create_uploaded_book,
     delete_user_book,
-    get_book_display_title,
+    delete_user_book_cover,
     get_user_book_chapter,
     get_user_book_detail,
     list_user_book_chapters,
@@ -26,6 +34,8 @@ from app.services.books import (
     read_book_chapter_content,
     reparse_user_book,
     update_user_book_groups,
+    update_user_book_metadata,
+    upload_user_book_cover,
 )
 from app.services.reading_progress import ReadingProgressNotFoundError, get_user_reading_progress, upsert_user_reading_progress
 
@@ -62,8 +72,10 @@ def get_books(
     current_user: CurrentUser,
     db: Session = Depends(get_db),
     search: str | None = Query(default=None),
+    group_id: int | None = Query(default=None, ge=1),
+    sort: str = Query(default="created_at"),
 ) -> list[BookShelfItem]:
-    items = list_user_books(db, current_user.id, search)
+    items = list_user_books(db, current_user.id, search=search, group_id=group_id, sort=sort)
     return [BookShelfItem.model_validate(item) for item in items]
 
 
@@ -74,9 +86,90 @@ def get_book(book_id: int, current_user: CurrentUser, db: Session = Depends(get_
     except BookNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    payload = BookDetail.model_validate(book).model_dump()
-    payload["title"] = get_book_display_title(book.file_name, book.title)
-    return BookDetail.model_validate(payload)
+    return BookDetail.model_validate(book)
+
+
+def _update_book_metadata_response(
+    book_id: int,
+    payload: BookMetadataUpdate,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> BookDetail:
+    try:
+        book = update_user_book_metadata(
+            db,
+            current_user.id,
+            book_id,
+            title=payload.title,
+            author=payload.author,
+            description=payload.description,
+            fields_to_update=set(payload.model_fields_set),
+        )
+    except BookNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except BookUploadError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    return BookDetail.model_validate(book)
+
+
+@router.put("/{book_id}", response_model=BookDetail)
+def put_book(
+    book_id: int,
+    payload: BookMetadataUpdate,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> BookDetail:
+    return _update_book_metadata_response(book_id, payload, current_user, db)
+
+
+@router.patch("/{book_id}", response_model=BookDetail)
+def patch_book(
+    book_id: int,
+    payload: BookMetadataUpdate,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> BookDetail:
+    return _update_book_metadata_response(book_id, payload, current_user, db)
+
+
+@router.post("/{book_id}/cover", response_model=BookDetail)
+async def post_book_cover(
+    book_id: int,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+    file: UploadFile = File(...),
+) -> BookDetail:
+    try:
+        raw_bytes = await file.read()
+        book = upload_user_book_cover(
+            db,
+            current_user.id,
+            book_id,
+            filename=file.filename or "cover",
+            raw_bytes=raw_bytes,
+            content_type=file.content_type,
+        )
+    except BookNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except BookCoverError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    finally:
+        await file.close()
+
+    return BookDetail.model_validate(book)
+
+
+@router.delete("/{book_id}/cover", status_code=status.HTTP_204_NO_CONTENT)
+def delete_book_cover(book_id: int, current_user: CurrentUser, db: Session = Depends(get_db)) -> Response:
+    try:
+        delete_user_book_cover(db, current_user.id, book_id)
+    except BookNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except BookCoverError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/{book_id}/groups", response_model=list[BookGroupSummary])
@@ -202,4 +295,3 @@ def get_book_chapter(
             "content": content,
         }
     )
-

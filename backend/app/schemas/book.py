@@ -34,6 +34,12 @@ class BookUpdate(ORMModel):
     chapter_rule_id: int | None = None
 
 
+class BookMetadataUpdate(ORMModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    author: str | None = Field(default=None, max_length=255)
+    description: str | None = None
+
+
 class BookReparseRequest(ORMModel):
     chapter_rule_id: int = Field(ge=1)
 
@@ -43,6 +49,7 @@ class BookRead(BookBase):
     user_id: int
     file_name: str
     file_path: str
+    cover_url: str | None = None
     created_at: datetime
     updated_at: datetime
     groups: list[BookGroupSummary] = Field(default_factory=list)
@@ -55,13 +62,17 @@ class BookShelfItem(ORMModel):
     total_chapters: int
     total_words: int
     last_read_at: datetime | None = None
+    recent_read_at: datetime | None = None
     progress_percent: float | None = None
+    cover_url: str | None = None
     created_at: datetime
     updated_at: datetime
     groups: list[BookGroupSummary] = Field(default_factory=list)
 
 
 class BookDetail(BookRead):
+    recent_read_at: datetime | None = None
+    progress_percent: float | None = None
     chapter_rule: ChapterRuleRead | None = None
 
 

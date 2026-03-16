@@ -89,6 +89,8 @@ export interface BookGroupAssignmentPayload {
   group_ids: number[];
 }
 
+export type BookSortKey = "created_at" | "recent_read" | "title";
+
 export interface BookShelfItem {
   id: number;
   title: string;
@@ -96,7 +98,9 @@ export interface BookShelfItem {
   total_chapters: number;
   total_words: number;
   last_read_at: string | null;
+  recent_read_at: string | null;
   progress_percent: number | null;
+  cover_url: string | null;
   created_at: string;
   updated_at: string;
   groups: BookGroupSummary[];
@@ -114,10 +118,19 @@ export interface BookDetail {
   chapter_rule_id: number | null;
   file_name: string;
   file_path: string;
+  cover_url: string | null;
+  recent_read_at: string | null;
+  progress_percent: number | null;
   created_at: string;
   updated_at: string;
   chapter_rule?: ChapterRule | null;
   groups: BookGroupSummary[];
+}
+
+export interface BookMetadataPayload {
+  title?: string | null;
+  author?: string | null;
+  description?: string | null;
 }
 
 export interface BookChapter {

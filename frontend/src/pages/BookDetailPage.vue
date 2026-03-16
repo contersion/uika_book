@@ -28,9 +28,17 @@
 
     <template v-else-if="book">
       <section class="detail-hero">
-        <div class="detail-hero__cover">
-          <div class="detail-hero__cover-badge">TXT</div>
-          <div class="detail-hero__cover-letter">{{ getCoverLetter(book.title) }}</div>
+        <div class="detail-hero__cover" :class="{ 'detail-hero__cover--filled': !!book.cover_url }">
+          <img
+            v-if="resolvedCoverUrl"
+            class="detail-hero__cover-image"
+            :src="resolvedCoverUrl"
+            :alt="`${book.title} 封面`"
+          />
+          <template v-else>
+            <div class="detail-hero__cover-badge">TXT</div>
+            <div class="detail-hero__cover-letter">{{ getCoverLetter(book.title) }}</div>
+          </template>
         </div>
 
         <div class="detail-hero__body">
@@ -40,7 +48,7 @@
           <p class="detail-hero__description">
             {{
               book.description ||
-              "这本书还没有补充描述，你可以先查看目录、继续阅读，或切换目录规则后重新解析。"
+              "这本书还没有补充简介，你可以先查看目录、继续阅读，或切换目录规则后重新解析。"
             }}
           </p>
 
@@ -49,23 +57,70 @@
             <n-tag round :bordered="false">总字数 {{ formatWordCount(book.total_words) }}</n-tag>
             <n-tag round :bordered="false">当前规则 {{ currentRuleName }}</n-tag>
             <n-tag round :bordered="false">{{ progressTagLabel }}</n-tag>
+            <n-tag round :bordered="false">{{ progressPercentLabel }}</n-tag>
           </div>
 
           <div class="detail-hero__actions">
             <n-button type="primary" size="large" :loading="readingPending" @click="handleReadAction">
               {{ readActionLabel }}
             </n-button>
-            <n-button secondary size="large" @click="goToChapter(0)">
-              从第一章开始
-            </n-button>
             <n-button tertiary size="large" @click="openCatalog">
               查看目录
+            </n-button>
+            <n-button secondary size="large" @click="openEditor">
+              编辑信息
             </n-button>
           </div>
         </div>
       </section>
 
       <section class="detail-grid">
+        <n-card :bordered="false" class="detail-card">
+          <template #header>
+            <span class="detail-card__heading">阅读信息</span>
+          </template>
+
+          <div class="detail-info-grid">
+            <div class="detail-info-item">
+              <span>作者</span>
+              <strong>{{ book.author || "未填写" }}</strong>
+            </div>
+            <div class="detail-info-item">
+              <span>阅读进度</span>
+              <strong>{{ progressPercentLabel }}</strong>
+            </div>
+            <div class="detail-info-item">
+              <span>最近阅读</span>
+              <strong>{{ formatOptionalDate(book.recent_read_at) }}</strong>
+            </div>
+            <div class="detail-info-item">
+              <span>阅读定位</span>
+              <strong>{{ progressTagLabel }}</strong>
+            </div>
+            <div class="detail-info-item detail-info-item--wide">
+              <span>简介</span>
+              <strong class="detail-info-item__multiline">
+                {{ book.description || "暂无简介" }}
+              </strong>
+            </div>
+          </div>
+
+          <div class="detail-group-list">
+            <span class="detail-group-list__label">分组</span>
+            <div class="detail-group-list__tags">
+              <n-tag
+                v-for="group in book.groups"
+                :key="group.id"
+                round
+                :bordered="false"
+                type="warning"
+              >
+                {{ group.name }}
+              </n-tag>
+            </div>
+          </div>
+        </n-card>
+
         <n-card :bordered="false" class="detail-card">
           <template #header>
             <span class="detail-card__heading">文件信息</span>
@@ -81,7 +136,7 @@
               <strong>{{ book.encoding }}</strong>
             </div>
             <div class="detail-info-item">
-              <span>创建时间</span>
+              <span>收录时间</span>
               <strong>{{ formatDate(book.created_at) }}</strong>
             </div>
             <div class="detail-info-item">
@@ -92,11 +147,11 @@
 
           <div class="detail-file-path">
             <span class="detail-file-path__label">本地文件</span>
-            <code>{{ book.file_name }}</code>
+            <code>{{ book.file_path }}</code>
           </div>
         </n-card>
 
-        <n-card :bordered="false" class="detail-card">
+        <n-card :bordered="false" class="detail-card detail-card--full">
           <template #header>
             <span class="detail-card__heading">目录规则</span>
           </template>
@@ -132,6 +187,83 @@
         </n-card>
       </section>
 
+      <n-modal
+        v-model:show="editorVisible"
+        preset="card"
+        class="metadata-modal"
+        title="编辑书籍信息"
+        :bordered="false"
+      >
+        <div class="metadata-modal__layout">
+          <div class="metadata-modal__cover-panel">
+            <div class="metadata-modal__cover" :class="{ 'metadata-modal__cover--filled': !!book.cover_url }">
+              <img
+                v-if="resolvedCoverUrl"
+                class="metadata-modal__cover-image"
+                :src="resolvedCoverUrl"
+                :alt="`${book.title} 封面`"
+              />
+              <template v-else>
+                <span class="metadata-modal__cover-type">TXT</span>
+                <strong class="metadata-modal__cover-letter">{{ getCoverLetter(book.title) }}</strong>
+                <span class="metadata-modal__cover-text">无封面</span>
+              </template>
+            </div>
+
+            <div class="metadata-modal__cover-actions">
+              <n-upload
+                accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                :show-file-list="false"
+                :max="1"
+                :custom-request="handleCoverUpload"
+              >
+                <n-button secondary :loading="coverUploading">上传封面</n-button>
+              </n-upload>
+              <n-button
+                v-if="book.cover_url"
+                quaternary
+                type="error"
+                :loading="coverDeleting"
+                @click="handleRemoveCover"
+              >
+                删除封面
+              </n-button>
+            </div>
+          </div>
+
+          <div class="metadata-modal__form">
+            <label class="metadata-modal__field">
+              <span>书名</span>
+              <n-input v-model:value="editableTitle" placeholder="用于全局显示的书名" clearable />
+            </label>
+
+            <label class="metadata-modal__field">
+              <span>作者</span>
+              <n-input v-model:value="editableAuthor" placeholder="作者可留空" clearable />
+            </label>
+
+            <label class="metadata-modal__field">
+              <span>简介</span>
+              <n-input
+                v-model:value="editableDescription"
+                type="textarea"
+                placeholder="支持多行简介"
+                :autosize="{ minRows: 6, maxRows: 12 }"
+              />
+            </label>
+          </div>
+        </div>
+
+        <template #action>
+          <div class="metadata-modal__footer">
+            <n-button @click="editorVisible = false">取消</n-button>
+            <n-button type="primary" :loading="metadataSaving" @click="handleSaveMetadata">
+              保存修改
+            </n-button>
+          </div>
+        </template>
+      </n-modal>
+
       <chapter-catalog-modal-drawer
         v-model:show="catalogVisible"
         :book-title="book.title"
@@ -149,20 +281,24 @@ import {
   NAlert,
   NButton,
   NCard,
+  NInput,
+  NModal,
   NSelect,
   NSkeleton,
   NTag,
+  NUpload,
   useMessage,
+  type UploadCustomRequestOptions,
 } from "naive-ui";
 import { useRouter } from "vue-router";
 
 import { booksApi } from "../api/books";
+import { resolveApiAssetUrl, ApiError, getErrorMessage } from "../api/client";
 import { chapterRulesApi } from "../api/chapter-rules";
-import { ApiError, getErrorMessage } from "../api/client";
 import ChapterCatalogModalDrawer from "../components/ChapterCatalogModalDrawer.vue";
 import PageStatusPanel from "../components/PageStatusPanel.vue";
 import type { BookChapter, BookDetail, ChapterRule, ReadingProgress } from "../types/api";
-import { formatDateTime, formatNumber, formatWordCount } from "../utils/format";
+import { formatDateTime, formatNumber, formatPercent, formatWordCount } from "../utils/format";
 
 const props = defineProps<{
   bookId: number;
@@ -170,6 +306,7 @@ const props = defineProps<{
 
 const router = useRouter();
 const message = useMessage();
+const BOOK_METADATA_UPDATED_EVENT = "books:metadata-updated";
 const book = ref<BookDetail | null>(null);
 const chapters = ref<BookChapter[]>([]);
 const rules = ref<ChapterRule[]>([]);
@@ -180,7 +317,14 @@ const pageError = ref<string | null>(null);
 const rulesError = ref<string | null>(null);
 const readingPending = ref(false);
 const reparsePending = ref(false);
+const editorVisible = ref(false);
+const metadataSaving = ref(false);
+const coverUploading = ref(false);
+const coverDeleting = ref(false);
 const catalogVisible = ref(false);
+const editableTitle = ref("");
+const editableAuthor = ref("");
+const editableDescription = ref("");
 
 const ruleOptions = computed(() => {
   return rules.value.map((rule) => ({
@@ -219,13 +363,29 @@ const progressTagLabel = computed(() => {
   return `上次读到第 ${formatNumber(progress.value.chapter_index + 1)} 章`;
 });
 
+const progressPercentLabel = computed(() => {
+  return `进度 ${formatPercent(book.value?.progress_percent ?? progress.value?.percent ?? 0)}`;
+});
+
+const resolvedCoverUrl = computed(() => resolveApiAssetUrl(book.value?.cover_url));
+
 function formatDate(value: string) {
   return formatDateTime(value, "时间未知");
+}
+
+function formatOptionalDate(value: string | null | undefined) {
+  return formatDateTime(value, "未开始");
 }
 
 function getCoverLetter(title: string) {
   const normalized = title.trim();
   return normalized ? normalized.slice(0, 1).toUpperCase() : "T";
+}
+
+function syncEditorFields(bookDetail: BookDetail) {
+  editableTitle.value = bookDetail.title;
+  editableAuthor.value = bookDetail.author || "";
+  editableDescription.value = bookDetail.description || "";
 }
 
 async function loadBookAndChapters() {
@@ -237,6 +397,7 @@ async function loadBookAndChapters() {
   book.value = bookDetail;
   chapters.value = chapterList;
   selectedRuleId.value = bookDetail.chapter_rule_id;
+  syncEditorFields(bookDetail);
 }
 
 async function loadRules() {
@@ -310,6 +471,15 @@ function openCatalog() {
   catalogVisible.value = true;
 }
 
+function openEditor() {
+  if (!book.value) {
+    return;
+  }
+
+  syncEditorFields(book.value);
+  editorVisible.value = true;
+}
+
 function handleCatalogSelect(chapterIndex: number) {
   catalogVisible.value = false;
   goToChapter(chapterIndex);
@@ -327,6 +497,81 @@ async function handleReadAction() {
     goToChapter(progress.value.chapter_index);
   } finally {
     readingPending.value = false;
+  }
+}
+
+async function handleSaveMetadata() {
+  if (!book.value) {
+    return;
+  }
+
+  metadataSaving.value = true;
+
+  try {
+    await booksApi.updateMetadata(book.value.id, {
+      title: editableTitle.value.trim() || null,
+      author: editableAuthor.value.trim() || null,
+      description: editableDescription.value.trim() || null,
+    });
+    const refreshed = await booksApi.detail(book.value.id);
+    book.value = refreshed;
+    syncEditorFields(refreshed);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(BOOK_METADATA_UPDATED_EVENT, { detail: { bookId: book.value.id } }));
+    }
+    editorVisible.value = false;
+    message.success("书籍信息已保存");
+  } catch (error) {
+    message.error(getErrorMessage(error));
+  } finally {
+    metadataSaving.value = false;
+  }
+}
+
+async function handleCoverUpload(options: UploadCustomRequestOptions) {
+  if (!book.value) {
+    options.onError?.();
+    return;
+  }
+
+  const file = options.file.file;
+  if (!(file instanceof File)) {
+    options.onError?.();
+    message.error("未找到可上传的封面文件");
+    return;
+  }
+
+  coverUploading.value = true;
+
+  try {
+    const updated = await booksApi.uploadCover(book.value.id, file);
+    book.value = updated;
+    options.onFinish?.();
+    message.success("封面已更新");
+  } catch (error) {
+    options.onError?.();
+    message.error(getErrorMessage(error));
+  } finally {
+    coverUploading.value = false;
+  }
+}
+
+async function handleRemoveCover() {
+  if (!book.value) {
+    return;
+  }
+
+  coverDeleting.value = true;
+
+  try {
+    await booksApi.deleteCover(book.value.id);
+    const refreshed = await booksApi.detail(book.value.id);
+    book.value = refreshed;
+    message.success("封面已删除");
+  } catch (error) {
+    message.error(getErrorMessage(error));
+  } finally {
+    coverDeleting.value = false;
   }
 }
 
@@ -353,6 +598,7 @@ watch(
   () => props.bookId,
   () => {
     catalogVisible.value = false;
+    editorVisible.value = false;
     void loadPage();
   },
   { immediate: true },
@@ -412,13 +658,15 @@ watch(
   overflow: hidden;
 }
 
-.detail-hero__cover::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0)),
-    linear-gradient(0deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0));
+.detail-hero__cover--filled {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.detail-hero__cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .detail-hero__cover-badge {
@@ -478,6 +726,7 @@ watch(
   margin: 0;
   color: var(--text-secondary);
   line-height: 1.8;
+  white-space: pre-wrap;
 }
 
 .detail-hero__tags {
@@ -502,6 +751,10 @@ watch(
   font-weight: 700;
 }
 
+.detail-card--full {
+  grid-column: 1 / -1;
+}
+
 .detail-info-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -512,6 +765,10 @@ watch(
   padding: 14px 16px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.55);
+}
+
+.detail-info-item--wide {
+  grid-column: 1 / -1;
 }
 
 .detail-info-item span {
@@ -526,18 +783,36 @@ watch(
   line-height: 1.6;
 }
 
-.detail-file-path {
+.detail-info-item__multiline {
+  white-space: pre-wrap;
+}
+
+.detail-group-list {
   margin-top: 14px;
   padding: 14px 16px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.55);
 }
 
+.detail-group-list__label,
 .detail-file-path__label {
   display: block;
   margin-bottom: 8px;
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+.detail-group-list__tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.detail-file-path {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .detail-file-path code {
@@ -579,9 +854,95 @@ watch(
   gap: 12px;
 }
 
+.metadata-modal :deep(.n-card) {
+  width: min(920px, calc(100vw - 24px));
+  border-radius: 24px;
+}
+
+.metadata-modal__layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 20px;
+}
+
+.metadata-modal__cover-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.metadata-modal__cover {
+  display: grid;
+  place-items: center;
+  min-height: 280px;
+  border-radius: 22px;
+  border: 1px solid rgba(109, 90, 74, 0.12);
+  background: linear-gradient(180deg, #fffdf8 0%, #f3eadb 100%);
+  overflow: hidden;
+  color: #6d5a4a;
+}
+
+.metadata-modal__cover--filled {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.metadata-modal__cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.metadata-modal__cover-type {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--primary-color);
+}
+
+.metadata-modal__cover-letter {
+  font-family: var(--font-display);
+  font-size: 68px;
+  line-height: 1;
+}
+
+.metadata-modal__cover-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.metadata-modal__cover-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.metadata-modal__form {
+  display: grid;
+  gap: 16px;
+}
+
+.metadata-modal__field {
+  display: grid;
+  gap: 8px;
+}
+
+.metadata-modal__field span {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.metadata-modal__footer {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 @media (max-width: 960px) {
   .detail-hero,
-  .detail-grid {
+  .detail-grid,
+  .metadata-modal__layout {
     grid-template-columns: 1fr;
   }
 
@@ -594,9 +955,14 @@ watch(
   .book-detail-page__topbar,
   .detail-hero__actions,
   .detail-rule-card__actions,
-  .detail-info-grid {
+  .detail-info-grid,
+  .metadata-modal__footer {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .detail-info-item--wide {
+    grid-column: auto;
   }
 }
 </style>
