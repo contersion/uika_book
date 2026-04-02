@@ -203,12 +203,13 @@
             class="reader-drawer__progress"
           />
 
-          <div class="reader-catalog__list reader-catalog__list--drawer">
+          <div ref="catalogListRef" class="reader-catalog__list reader-catalog__list--drawer">
             <button
               v-for="chapter in chapters"
               :key="`drawer-${chapter.id}`"
               type="button"
               class="reader-catalog__item"
+              :ref="(element) => setCatalogItemRef(chapter.chapter_index, element)"
               :class="{
                 'reader-catalog__item--active': chapter.chapter_index === currentChapterIndex,
               }"
@@ -282,6 +283,7 @@
 </template>
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import type { ComponentPublicInstance } from "vue";
 import {
   NAlert,
   NButton,
@@ -358,15 +360,18 @@ const preferences = reactive({
   ...preferencesStore.reader,
 });
 const contentRef = ref<HTMLElement | null>(null);
+const catalogListRef = ref<HTMLElement | null>(null);
 const activeDrawer = ref<ReaderDrawerView | null>(null);
 const mobileChromeVisible = ref(false);
 const viewportWidth = ref(COMPACT_BREAKPOINT + 200);
+const catalogItemRefs = new Map<number, HTMLElement>();
 
 let progressSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let saveInFlight = false;
 let queuedSnapshot: ProgressSnapshot | null = null;
 let lastSavedProgressKey = "";
 let suppressScrollTrackingUntil = 0;
+let catalogScrollToken = 0;
 
 const isCompactViewport = computed(() => viewportWidth.value <= COMPACT_BREAKPOINT);
 const shouldShowChrome = computed(() => !isCompactViewport.value || mobileChromeVisible.value);
@@ -519,6 +524,28 @@ watch(
   },
 );
 
+watch(
+  () => activeDrawer.value,
+  (value, previousValue) => {
+    if (value === previousValue || value !== "catalog") {
+      return;
+    }
+
+    void scheduleCatalogAutoScroll();
+  },
+);
+
+watch(
+  currentChapterIndex,
+  (value, previousValue) => {
+    if (value === previousValue || activeDrawer.value !== "catalog") {
+      return;
+    }
+
+    void scheduleCatalogAutoScroll();
+  },
+);
+
 onMounted(() => {
   if (typeof window === "undefined") {
     return;
@@ -532,6 +559,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearScheduledProgressSync();
+  catalogScrollToken += 1;
+  catalogItemRefs.clear();
 
   if (typeof window === "undefined") {
     return;
@@ -676,6 +705,62 @@ function handleWindowResize() {
 function openDrawer(view: ReaderDrawerView) {
   activeDrawer.value = view;
   mobileChromeVisible.value = true;
+}
+
+function setCatalogItemRef(chapterIndex: number, element: Element | ComponentPublicInstance | null) {
+  const resolvedElement = element instanceof HTMLElement
+    ? element
+    : element && "$el" in element && element.$el instanceof HTMLElement
+      ? element.$el
+      : null;
+
+  if (resolvedElement) {
+    catalogItemRefs.set(chapterIndex, resolvedElement);
+    return;
+  }
+
+  catalogItemRefs.delete(chapterIndex);
+}
+
+function waitForNextPaint() {
+  if (typeof window === "undefined") {
+    return Promise.resolve();
+  }
+
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+}
+
+async function scheduleCatalogAutoScroll() {
+  const taskToken = ++catalogScrollToken;
+
+  // 等抽屉和目录项渲染完成后再滚动，避免拿不到当前章节节点。
+  await nextTick();
+  await waitForNextPaint();
+  await waitForNextPaint();
+
+  if (taskToken !== catalogScrollToken || activeDrawer.value !== "catalog") {
+    return;
+  }
+
+  scrollCatalogToCurrentChapter();
+}
+
+function scrollCatalogToCurrentChapter() {
+  const catalogList = catalogListRef.value;
+  const currentChapterElement = catalogItemRefs.get(currentChapterIndex.value);
+
+  if (!catalogList || !currentChapterElement) {
+    return;
+  }
+
+  // 当前章节不存在时安全降级；存在时尽量滚到容器中部，减少手动翻找。
+  currentChapterElement.scrollIntoView({
+    block: "center",
+    inline: "nearest",
+    behavior: "auto",
+  });
 }
 
 function handleReadingSurfaceTap() {
