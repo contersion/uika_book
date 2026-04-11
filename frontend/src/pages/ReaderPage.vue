@@ -117,13 +117,25 @@
             :class="{ 'reader-content--dimmed': chapterLoading }"
           >
             <template v-if="currentChapter">
-              <p
-                v-for="(paragraph, index) in currentChapterParagraphs"
-                :key="`paragraph-${currentChapterIndex}-${index}`"
-                class="reader-content__paragraph"
+              <template
+                v-for="(block, index) in currentChapterBlocks"
+                :key="`block-${currentChapterIndex}-${index}`"
               >
-                {{ paragraph }}
-              </p>
+                <p
+                  v-if="block.type === 'paragraph'"
+                  class="reader-content__paragraph"
+                >
+                  {{ block.content }}
+                </p>
+                <figure v-else class="reader-content__image-block">
+                  <img
+                    class="reader-content__image"
+                    :src="block.src"
+                    :alt="block.alt"
+                    loading="lazy"
+                  />
+                </figure>
+              </template>
             </template>
             <template v-else>正文载入中...</template>
           </article>
@@ -308,7 +320,7 @@ import {
 import { useRoute, useRouter } from "vue-router";
 
 import { booksApi } from "../api/books";
-import { ApiError, buildApiUrl, getErrorMessage } from "../api/client";
+import { ApiError, buildApiUrl, getErrorMessage, resolveApiAssetUrl } from "../api/client";
 import { usePreferencesStore } from "../stores/preferences";
 import type {
   BookChapter,
@@ -339,6 +351,21 @@ interface ReaderChapterContentView {
   body: string;
   trimmedPrefixLength: number;
 }
+
+interface ReaderParagraphBlock {
+  type: "paragraph";
+  content: string;
+}
+
+interface ReaderImageBlock {
+  type: "image";
+  src: string;
+  alt: string;
+}
+
+type ReaderContentBlock = ReaderParagraphBlock | ReaderImageBlock;
+
+const READER_IMAGE_TAG_PATTERN = /<img\b[^>]*>/giu;
 
 const props = withDefaults(
   defineProps<{
@@ -419,7 +446,7 @@ const currentChapterContentView = computed<ReaderChapterContentView>(() => {
   );
 });
 const currentChapterBody = computed(() => currentChapterContentView.value.body);
-const currentChapterParagraphs = computed(() => buildReaderParagraphs(currentChapterBody.value));
+const currentChapterBlocks = computed(() => buildReaderContentBlocks(currentChapterBody.value));
 const currentChapterTrimmedPrefixLength = computed(() => currentChapterContentView.value.trimmedPrefixLength);
 const currentChapterPositionLabel = computed(() => {
   if (chapters.value.length === 0) {
@@ -687,6 +714,70 @@ function buildReaderParagraphs(content: string) {
     .filter((paragraph) => paragraph.length > 0);
 
   return paragraphs.length > 0 ? paragraphs : [content.trim()];
+}
+
+function buildReaderContentBlocks(content: string): ReaderContentBlock[] {
+  if (!content) {
+    return [];
+  }
+
+  const blocks: ReaderContentBlock[] = [];
+  let segmentStart = 0;
+
+  for (const match of content.matchAll(READER_IMAGE_TAG_PATTERN)) {
+    const imageTag = match[0];
+    const imageIndex = match.index ?? -1;
+
+    if (imageIndex < 0) {
+      continue;
+    }
+
+    appendReaderParagraphBlocks(blocks, content.slice(segmentStart, imageIndex));
+
+    const imageBlock = buildReaderImageBlock(imageTag);
+    if (imageBlock) {
+      blocks.push(imageBlock);
+    } else {
+      appendReaderParagraphBlocks(blocks, imageTag);
+    }
+
+    segmentStart = imageIndex + imageTag.length;
+  }
+
+  appendReaderParagraphBlocks(blocks, content.slice(segmentStart));
+  return blocks;
+}
+
+function appendReaderParagraphBlocks(blocks: ReaderContentBlock[], content: string) {
+  for (const paragraph of buildReaderParagraphs(content)) {
+    blocks.push({
+      type: "paragraph",
+      content: paragraph,
+    });
+  }
+}
+
+function buildReaderImageBlock(tag: string): ReaderImageBlock | null {
+  const rawSrc = extractReaderHtmlAttribute(tag, "src")?.trim() || "";
+  if (!rawSrc) {
+    return null;
+  }
+
+  return {
+    type: "image",
+    src: resolveApiAssetUrl(rawSrc) ?? rawSrc,
+    alt: extractReaderHtmlAttribute(tag, "alt")?.trim() || "",
+  };
+}
+
+function extractReaderHtmlAttribute(tag: string, attributeName: string) {
+  const attributePattern = new RegExp(
+    `${attributeName}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`,
+    "iu",
+  );
+  const match = attributePattern.exec(tag);
+
+  return match?.[1] ?? match?.[2] ?? match?.[3] ?? null;
 }
 
 function isReaderChapterWhitespace(character: string) {
@@ -1596,6 +1687,27 @@ function goBack() {
 
 .reader-content__paragraph + .reader-content__paragraph {
   margin-top: calc(var(--reader-font-size) * var(--reader-line-height) * var(--reader-paragraph-spacing));
+}
+
+.reader-content__paragraph + .reader-content__image-block,
+.reader-content__image-block + .reader-content__paragraph,
+.reader-content__image-block + .reader-content__image-block {
+  margin-top: calc(var(--reader-font-size) * var(--reader-line-height) * var(--reader-paragraph-spacing));
+}
+
+.reader-content__image-block {
+  margin: 0;
+}
+
+.reader-content__image {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: min(72dvh, 960px);
+  margin: 0 auto;
+  border-radius: 22px;
+  object-fit: contain;
+  box-shadow: 0 20px 48px rgba(35, 22, 12, 0.18);
 }
 
 .reader-content--dimmed {
