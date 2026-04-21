@@ -56,6 +56,10 @@ def test_get_preferences_returns_defaults_when_user_has_no_saved_preferences(mon
             "paragraph_spacing": 1.0,
             "content_width": 72,
             "theme": "light",
+            # 二次元 UI 主题扩展字段默认值
+            "theme_color": "#F4A4B4",
+            "border_radius": "soft",
+            "font_family": "lxgwwenkai",
         },
     }
 
@@ -101,6 +105,10 @@ def test_patch_preferences_persists_bookshelf_and_reader_settings(monkeypatch, t
         "paragraph_spacing": 1.4,
         "content_width": 76,
         "theme": "dark",
+        # 未显式传入的新字段应自动填充默认值（主题色统一归一化为小写）
+        "theme_color": "#f4a4b4",
+        "border_radius": "soft",
+        "font_family": "lxgwwenkai",
     }
     assert get_response.status_code == 200
     assert get_response.json() == patch_payload
@@ -147,6 +155,10 @@ def test_get_preferences_normalizes_invalid_legacy_payload(monkeypatch, tmp_path
             "paragraph_spacing": 1.0,
             "content_width": 72,
             "theme": "light",
+            # 非法旧数据被归一化后，新字段填充默认值
+            "theme_color": "#F4A4B4",
+            "border_radius": "soft",
+            "font_family": "lxgwwenkai",
         },
     }
 

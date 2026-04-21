@@ -52,13 +52,13 @@ const badgeLabel = computed(() => {
 }
 
 .page-status-panel--empty .page-status-panel__badge {
-  background: rgba(52, 107, 97, 0.12);
-  color: var(--accent-color);
+  background: rgba(244, 164, 180, 0.16);
+  color: var(--primary-color);
 }
 
 .page-status-panel--error .page-status-panel__badge {
-  background: rgba(208, 58, 46, 0.12);
-  color: #b0302a;
+  background: rgba(255, 107, 107, 0.12);
+  color: #e05555;
 }
 
 .page-status-panel__title {

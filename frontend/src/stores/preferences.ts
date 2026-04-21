@@ -31,6 +31,10 @@ export interface ReaderPreferencesState {
   paragraphSpacing: number;
   contentWidth: number;
   theme: "light" | "dark";
+  // 二次元 UI 主题扩展字段
+  themeColor: string;
+  borderRadius: "soft" | "standard";
+  fontFamily: "lxgwwenkai" | "system";
 }
 
 interface PreferencesState {
@@ -61,6 +65,10 @@ export const DEFAULT_READER_PREFERENCES: ReaderPreferencesState = {
   paragraphSpacing: 1,
   contentWidth: 72,
   theme: "light",
+  // 二次元 UI 主题默认值：樱花粉、大圆角、霞鹜文楷
+  themeColor: "#f4a4b4",
+  borderRadius: "soft",
+  fontFamily: "lxgwwenkai",
 };
 
 let pendingPatch: ApiUserPreferencesPatchRequest = {};
@@ -109,7 +117,28 @@ function normalizeReaderPreferences(input?: Partial<ReaderPreferencesState>): Re
     ),
     contentWidth: Math.round(clampNumber(input?.contentWidth, 56, 96, DEFAULT_READER_PREFERENCES.contentWidth)),
     theme: input?.theme === "dark" ? "dark" : "light",
+    // 二次元 UI 主题字段归一化：非法值回退到默认值，确保 UI 不会因脏数据崩溃
+    themeColor: _normalizeHexColor(input?.themeColor, DEFAULT_READER_PREFERENCES.themeColor),
+    borderRadius: input?.borderRadius === "standard" ? "standard" : "soft",
+    fontFamily: input?.fontFamily === "system" ? "system" : "lxgwwenkai",
   };
+}
+
+/** 校验并归一化十六进制颜色值，仅接受 #RRGGBB 格式，非法输入回退到默认值 */
+function _normalizeHexColor(value: unknown, fallback: string): string {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 7 && trimmed.startsWith("#")) {
+    try {
+      parseInt(trimmed.slice(1), 16);
+      return trimmed.toLowerCase();
+    } catch {
+      // 非法十六进制，回退默认值
+    }
+  }
+  return fallback;
 }
 
 function fromApiBookshelfPreferences(input: ApiBookshelfPreferences): BookshelfPreferencesState {
@@ -130,6 +159,9 @@ function fromApiReaderPreferences(input: ApiReaderPreferences): ReaderPreference
     paragraphSpacing: input.paragraph_spacing,
     contentWidth: input.content_width,
     theme: input.theme,
+    themeColor: input.theme_color,
+    borderRadius: input.border_radius,
+    fontFamily: input.font_family,
   });
 }
 
@@ -176,6 +208,16 @@ function toApiReaderPatch(input: Partial<ReaderPreferencesState>): ApiReaderPref
   if (input.theme !== undefined) {
     patch.theme = input.theme;
   }
+  // 二次元 UI 主题字段映射：仅当值存在时才加入 patch，遵循原有 unset 语义
+  if (input.themeColor !== undefined) {
+    patch.theme_color = input.themeColor;
+  }
+  if (input.borderRadius !== undefined) {
+    patch.border_radius = input.borderRadius;
+  }
+  if (input.fontFamily !== undefined) {
+    patch.font_family = input.fontFamily;
+  }
 
   return patch;
 }
@@ -212,6 +254,9 @@ function loadLegacyReaderPreferences(): ReaderPreferencesState | null {
       paragraphSpacing?: number;
       contentWidth?: number;
       theme?: "light" | "dark";
+      themeColor?: string;
+      borderRadius?: "soft" | "standard";
+      fontFamily?: "lxgwwenkai" | "system";
     };
 
     return normalizeReaderPreferences({
@@ -221,6 +266,9 @@ function loadLegacyReaderPreferences(): ReaderPreferencesState | null {
       paragraphSpacing: parsed.paragraphSpacing,
       contentWidth: parsed.contentWidth,
       theme: parsed.theme,
+      themeColor: parsed.themeColor,
+      borderRadius: parsed.borderRadius,
+      fontFamily: parsed.fontFamily,
     });
   } catch {
     return null;
@@ -286,6 +334,8 @@ export const usePreferencesStore = defineStore("preferences", {
         this.reader = loadLegacyReaderPreferences() ?? createDefaultReaderPreferences();
         this.hasSavedPreferences = false;
         this.persistLegacyReaderPreferences();
+        // 错误恢复后也要确保主题变量已正确注入 DOM
+        this.applyReaderThemeToDOM();
       } finally {
         this.loading = false;
         this.initialized = true;
@@ -297,6 +347,8 @@ export const usePreferencesStore = defineStore("preferences", {
       this.reader = fromApiReaderPreferences(response.preferences.reader);
       this.hasSavedPreferences = response.has_saved_preferences;
       this.saveErrorMessage = null;
+      // 从服务端恢复偏好后，立即将主题设置应用到 DOM，避免视觉闪烁
+      this.applyReaderThemeToDOM();
     },
     patchBookshelf(input: Partial<BookshelfPreferencesState>, debounceMs = SAVE_DEBOUNCE_MS) {
       const nextValue = normalizeBookshelfPreferences({
@@ -358,12 +410,23 @@ export const usePreferencesStore = defineStore("preferences", {
       if (nextValue.theme !== this.reader.theme) {
         changedPatch.theme = nextValue.theme;
       }
+      // 二次元 UI 主题字段变更检测：任一字段变化即触发保存与 DOM 更新
+      if (nextValue.themeColor !== this.reader.themeColor) {
+        changedPatch.themeColor = nextValue.themeColor;
+      }
+      if (nextValue.borderRadius !== this.reader.borderRadius) {
+        changedPatch.borderRadius = nextValue.borderRadius;
+      }
+      if (nextValue.fontFamily !== this.reader.fontFamily) {
+        changedPatch.fontFamily = nextValue.fontFamily;
+      }
 
       if (Object.keys(changedPatch).length === 0) {
         return;
       }
 
       this.reader = nextValue;
+      this.applyReaderThemeToDOM();
       this.persistLegacyReaderPreferences();
       this.queuePatch(
         {
@@ -425,6 +488,23 @@ export const usePreferencesStore = defineStore("preferences", {
         });
 
       await savePromise;
+    },
+    /** 将当前阅读器偏好中的主题设置实时注入 CSS 变量，实现无刷新主题切换 */
+    applyReaderThemeToDOM() {
+      if (typeof document === "undefined") {
+        return;
+      }
+      // 将用户自定义主题色注入 CSS 变量，覆盖 index.css 中的默认值
+      document.documentElement.style.setProperty("--primary-color", this.reader.themeColor);
+      // 根据字体选择动态调整全局字体栈
+      const fontFamily = this.reader.fontFamily === "lxgwwenkai"
+        ? '"LXGW WenKai", "PingFang SC", "Microsoft YaHei", sans-serif'
+        : '"PingFang SC", "Microsoft YaHei", sans-serif';
+      document.documentElement.style.setProperty("--font-sans", fontFamily);
+      // 根据圆角风格调整全局圆角：soft 模式更圆润，standard 模式更克制
+      const radiusBase = this.reader.borderRadius === "soft" ? 22 : 12;
+      document.documentElement.style.setProperty("--radius-lg", `${radiusBase}px`);
+      document.documentElement.style.setProperty("--radius-xl", `${radiusBase + 6}px`);
     },
     persistLegacyReaderPreferences() {
       if (typeof window === "undefined") {

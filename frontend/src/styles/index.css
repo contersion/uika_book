@@ -1,54 +1,61 @@
 :root {
   color-scheme: light;
   font-family: var(--font-sans);
+  /* 二次元字体栈：霞鹜文楷为首，提供温暖手写感；后续为系统 fallback */
   --font-sans:
-    "Avenir Next",
+    "LXGW WenKai",
     "PingFang SC",
     "Hiragino Sans GB",
     "Microsoft YaHei",
     sans-serif;
   --font-display:
+    "LXGW WenKai",
     "Palatino Linotype",
     "Times New Roman",
     "STSong",
     serif;
+  /* 粉白二次元浅色背景：樱花牛奶渐变 + 淡粉紫光晕 */
   --app-background:
-    radial-gradient(circle at top left, rgba(224, 188, 142, 0.35), transparent 24%),
-    radial-gradient(circle at bottom right, rgba(110, 145, 136, 0.24), transparent 30%),
-    linear-gradient(180deg, #f8f2e8 0%, #f0e5d5 100%);
-  --app-shell-color: #efe4d4;
-  --surface-color: #fffaf2;
-  --surface-shadow: 0 18px 48px rgba(82, 55, 28, 0.12);
-  --surface-raised: color-mix(in srgb, var(--surface-color) 94%, white 6%);
-  --surface-soft: color-mix(in srgb, var(--surface-color) 82%, white 18%);
-  --surface-header-bg: rgba(255, 250, 242, 0.88);
-  --surface-panel-bg: rgba(255, 255, 255, 0.68);
-  --surface-panel-soft-bg: rgba(255, 255, 255, 0.48);
-  --surface-card-bg: rgba(255, 252, 247, 0.82);
-  --surface-input-bg: rgba(255, 255, 255, 0.72);
-  --surface-empty-bg: rgba(255, 250, 242, 0.78);
-  --surface-stat-bg: rgba(255, 255, 255, 0.64);
-  --surface-mobile-card-bg: rgba(255, 255, 255, 0.56);
-  --surface-intro-bg: rgba(255, 255, 255, 0.58);
-  --surface-test-bg: rgba(255, 255, 255, 0.5);
-  --surface-tab-hover-bg: rgba(109, 90, 74, 0.08);
-  --surface-tab-active-bg: rgba(255, 255, 255, 0.86);
-  --surface-tab-active-border: rgba(184, 93, 54, 0.16);
-  --surface-cover-bg: linear-gradient(180deg, #fffdf8 0%, #f3eadb 100%);
+    radial-gradient(circle at top left, rgba(244, 164, 180, 0.18), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(201, 177, 255, 0.14), transparent 30%),
+    linear-gradient(180deg, #FFF5F7 0%, #FFF0F3 100%);
+  --app-shell-color: #FFF0F3;
+  /* 表面色：纯白与极淡粉，保持干净清爽 */
+  --surface-color: #FFFFFF;
+  --surface-shadow: 0 18px 48px rgba(244, 164, 180, 0.12);
+  --surface-raised: color-mix(in srgb, var(--surface-color) 96%, #F4A4B4 4%);
+  --surface-soft: color-mix(in srgb, var(--surface-color) 90%, #FFF0F3 10%);
+  --surface-header-bg: rgba(255, 255, 255, 0.88);
+  --surface-panel-bg: rgba(255, 255, 255, 0.72);
+  --surface-panel-soft-bg: rgba(255, 245, 247, 0.56);
+  --surface-card-bg: rgba(255, 255, 255, 0.86);
+  --surface-input-bg: rgba(255, 245, 247, 0.68);
+  --surface-empty-bg: rgba(255, 245, 247, 0.78);
+  --surface-stat-bg: rgba(255, 240, 243, 0.64);
+  --surface-mobile-card-bg: rgba(255, 255, 255, 0.58);
+  --surface-intro-bg: rgba(255, 245, 247, 0.6);
+  --surface-test-bg: rgba(255, 245, 247, 0.52);
+  --surface-tab-hover-bg: rgba(244, 164, 180, 0.1);
+  --surface-tab-active-bg: rgba(255, 255, 255, 0.9);
+  --surface-tab-active-border: rgba(244, 164, 180, 0.3);
+  --surface-cover-bg: linear-gradient(180deg, #FFFDFE 0%, #F5E8EC 100%);
   --surface-cover-fill-bg: rgba(255, 255, 255, 0.72);
   --surface-cover-loading-bg: rgba(255, 255, 255, 0.82);
-  --surface-code-bg: rgba(46, 36, 29, 0.05);
-  --primary-color: #b85d36;
-  --primary-soft: rgba(184, 93, 54, 0.12);
-  --accent-color: #346b61;
-  --text-primary: #2e241d;
-  --text-secondary: #6d5a4a;
-  --border-color: rgba(109, 90, 74, 0.14);
-  --border-color-soft: rgba(109, 90, 74, 0.1);
-  --shadow-soft: 0 12px 30px rgba(82, 55, 28, 0.08);
-  --shadow-card: 0 16px 36px rgba(82, 55, 28, 0.1);
-  --shadow-modal: 0 24px 60px rgba(82, 55, 28, 0.16);
-  --radius-sm: 12px;
+  --surface-code-bg: rgba(244, 164, 180, 0.08);
+  /* 二次元主色调：樱花粉 + 薰衣草紫强调色 */
+  --primary-color: #F4A4B4;
+  --primary-soft: rgba(244, 164, 180, 0.18);
+  --accent-color: #C9B1FF;
+  --text-primary: #2D2D2D;
+  --text-secondary: #7A7A7A;
+  --border-color: rgba(244, 164, 180, 0.22);
+  --border-color-soft: rgba(244, 164, 180, 0.14);
+  /* 阴影基调改为带粉色调的弥散阴影 */
+  --shadow-soft: 0 12px 30px rgba(244, 164, 180, 0.1);
+  --shadow-card: 0 16px 36px rgba(244, 164, 180, 0.12);
+  --shadow-modal: 0 24px 60px rgba(244, 164, 180, 0.16);
+  /* 圆角系统：二次元风格使用更圆润的大圆角 */
+  --radius-sm: 10px;
   --radius-md: 16px;
   --radius-lg: 22px;
   --radius-xl: 28px;
@@ -68,42 +75,44 @@
 
 body.app-theme--dark {
   color-scheme: dark;
+  /* 深夜花町深色背景：深蓝紫基调 + 淡粉紫光晕 */
   --app-background:
-    radial-gradient(circle at top left, rgba(214, 141, 94, 0.12), transparent 22%),
-    radial-gradient(circle at bottom right, rgba(112, 160, 149, 0.12), transparent 28%),
-    linear-gradient(180deg, #171411 0%, #0d0b09 100%);
-  --app-shell-color: #1b1714;
-  --surface-color: #241f1a;
-  --surface-shadow: 0 18px 48px rgba(0, 0, 0, 0.36);
-  --surface-raised: rgba(33, 28, 24, 0.92);
-  --surface-soft: rgba(38, 32, 28, 0.78);
-  --surface-header-bg: rgba(26, 22, 19, 0.9);
+    radial-gradient(circle at top left, rgba(255, 143, 171, 0.1), transparent 25%),
+    radial-gradient(circle at bottom right, rgba(184, 169, 255, 0.1), transparent 25%),
+    linear-gradient(180deg, #1A1A2E 0%, #141426 100%);
+  --app-shell-color: #1A1A2E;
+  --surface-color: #252540;
+  --surface-shadow: 0 18px 48px rgba(0, 0, 0, 0.4);
+  --surface-raised: rgba(37, 37, 64, 0.92);
+  --surface-soft: rgba(42, 42, 70, 0.78);
+  --surface-header-bg: rgba(26, 26, 46, 0.92);
   --surface-panel-bg: rgba(255, 255, 255, 0.06);
   --surface-panel-soft-bg: rgba(255, 255, 255, 0.05);
-  --surface-card-bg: rgba(27, 23, 20, 0.9);
+  --surface-card-bg: rgba(37, 37, 64, 0.9);
   --surface-input-bg: rgba(255, 255, 255, 0.06);
-  --surface-empty-bg: rgba(29, 25, 21, 0.9);
+  --surface-empty-bg: rgba(37, 37, 64, 0.9);
   --surface-stat-bg: rgba(255, 255, 255, 0.05);
   --surface-mobile-card-bg: rgba(255, 255, 255, 0.04);
   --surface-intro-bg: rgba(255, 255, 255, 0.05);
   --surface-test-bg: rgba(255, 255, 255, 0.04);
-  --surface-tab-hover-bg: rgba(255, 255, 255, 0.05);
+  --surface-tab-hover-bg: rgba(255, 143, 171, 0.08);
   --surface-tab-active-bg: rgba(255, 255, 255, 0.08);
-  --surface-tab-active-border: rgba(214, 141, 94, 0.22);
-  --surface-cover-bg: linear-gradient(180deg, #2c2622 0%, #191613 100%);
+  --surface-tab-active-border: rgba(255, 143, 171, 0.3);
+  --surface-cover-bg: linear-gradient(180deg, #2E2E4D 0%, #1E1E38 100%);
   --surface-cover-fill-bg: rgba(255, 255, 255, 0.05);
   --surface-cover-loading-bg: rgba(255, 255, 255, 0.08);
-  --surface-code-bg: rgba(255, 255, 255, 0.06);
-  --primary-color: #d68d5e;
-  --primary-soft: rgba(214, 141, 94, 0.16);
-  --accent-color: #78aba0;
-  --text-primary: #f3e7d9;
-  --text-secondary: #b9a693;
-  --border-color: rgba(243, 230, 215, 0.14);
-  --border-color-soft: rgba(243, 230, 215, 0.08);
-  --shadow-soft: 0 12px 30px rgba(0, 0, 0, 0.3);
-  --shadow-card: 0 16px 36px rgba(0, 0, 0, 0.38);
-  --shadow-modal: 0 24px 60px rgba(0, 0, 0, 0.46);
+  --surface-code-bg: rgba(255, 143, 171, 0.08);
+  /* 深色模式主色调：亮粉 + 亮紫 */
+  --primary-color: #FF8FAB;
+  --primary-soft: rgba(255, 143, 171, 0.18);
+  --accent-color: #B8A9FF;
+  --text-primary: #FFF0F3;
+  --text-secondary: #A0A0C0;
+  --border-color: rgba(255, 143, 171, 0.18);
+  --border-color-soft: rgba(255, 143, 171, 0.1);
+  --shadow-soft: 0 12px 30px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 16px 36px rgba(0, 0, 0, 0.42);
+  --shadow-modal: 0 24px 60px rgba(0, 0, 0, 0.5);
 }
 
 body.app-theme--light {
@@ -147,8 +156,13 @@ a {
   text-decoration: none;
 }
 
+/* 文本选中文本的背景色：使用主题粉的半透明版本 */
 ::selection {
-  background: rgba(184, 93, 54, 0.18);
+  background: rgba(244, 164, 180, 0.28);
+}
+
+body.app-theme--dark ::selection {
+  background: rgba(255, 143, 171, 0.35);
 }
 
 body.app-theme--dark .bookshelf-page__tabs {

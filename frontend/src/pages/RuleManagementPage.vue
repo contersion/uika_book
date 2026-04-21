@@ -1219,9 +1219,10 @@ onUnmounted(() => {
   padding: clamp(20px, 3vw, 28px);
   border: 1px solid var(--border-color-soft);
   border-radius: var(--radius-xl);
+  /* 二次元风格 hero 区：淡粉紫光晕 */
   background:
-    radial-gradient(circle at top right, rgba(52, 107, 97, 0.12), transparent 28%),
-    radial-gradient(circle at bottom left, rgba(184, 93, 54, 0.1), transparent 30%),
+    radial-gradient(circle at top right, rgba(201, 177, 255, 0.14), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(244, 164, 180, 0.12), transparent 30%),
     var(--surface-raised);
   box-shadow: var(--shadow-soft);
 }
@@ -1240,8 +1241,8 @@ onUnmounted(() => {
   margin-bottom: 12px;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(52, 107, 97, 0.12);
-  color: var(--accent-color);
+  background: rgba(244, 164, 180, 0.16);
+  color: var(--primary-color);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1431,7 +1432,8 @@ onUnmounted(() => {
   padding: 12px 14px;
   border: 1px solid var(--border-color-soft);
   border-radius: var(--radius-md);
-  background: rgba(46, 36, 29, 0.05);
+  /* 二次元风格代码块：极淡粉色背景 */
+  background: rgba(244, 164, 180, 0.08);
   color: var(--text-primary);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   font-size: 12px;

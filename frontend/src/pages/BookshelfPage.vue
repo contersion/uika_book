@@ -160,12 +160,12 @@
                 <span>阅读进度</span>
                 <strong>{{ formatProgress(book.progress_percent) }}</strong>
               </div>
-              <n-progress
+                          <n-progress
                 type="line"
                 :percentage="normalizeProgress(book.progress_percent)"
                 :show-indicator="false"
                 :height="6"
-                rail-color="rgba(109, 90, 74, 0.12)"
+                rail-color="rgba(244, 164, 180, 0.18)"
                 color="var(--primary-color)"
               />
             </div>
@@ -633,9 +633,10 @@ onUnmounted(() => {
   padding: clamp(18px, 2.6vw, 24px);
   border: 1px solid var(--border-color-soft);
   border-radius: var(--radius-xl);
+  /* 二次元风格工具栏背景：淡粉紫光晕 + 奶白表面色 */
   background:
-    radial-gradient(circle at top right, rgba(52, 107, 97, 0.08), transparent 28%),
-    radial-gradient(circle at bottom left, rgba(184, 93, 54, 0.08), transparent 34%),
+    radial-gradient(circle at top right, rgba(201, 177, 255, 0.1), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(244, 164, 180, 0.1), transparent 34%),
     var(--surface-raised);
   box-shadow: var(--shadow-soft);
 }
@@ -779,16 +780,16 @@ onUnmounted(() => {
 
 .bookshelf-page__tab:hover {
   color: var(--text-primary);
-  background: rgba(109, 90, 74, 0.08);
+  background: rgba(244, 164, 180, 0.1);
 }
 
 .bookshelf-page__tab--active {
   color: var(--primary-color);
-  background: rgba(255, 255, 255, 0.86);
-  border-color: rgba(184, 93, 54, 0.16);
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(244, 164, 180, 0.35);
   box-shadow:
-    inset 0 0 0 1px rgba(184, 93, 54, 0.05),
-    0 6px 14px rgba(82, 55, 28, 0.06);
+    inset 0 0 0 1px rgba(244, 164, 180, 0.1),
+    0 6px 14px rgba(244, 164, 180, 0.1);
 }
 
 .bookshelf-page__filter-actions {
@@ -840,9 +841,9 @@ onUnmounted(() => {
 
 .bookshelf-page__empty {
   padding: 52px 24px;
-  border: 1px solid rgba(109, 90, 74, 0.1);
+  border: 1px solid rgba(244, 164, 180, 0.18);
   border-radius: 22px;
-  background: rgba(255, 250, 242, 0.78);
+  background: rgba(255, 245, 247, 0.78);
 }
 
 .bookshelf-page__empty-tip {
@@ -881,8 +882,8 @@ onUnmounted(() => {
 }
 
 .bookshelf-item:hover {
-  transform: translateY(-2px);
-  border-color: rgba(184, 93, 54, 0.18);
+  transform: translateY(-4px);
+  border-color: rgba(244, 164, 180, 0.35);
   box-shadow: var(--shadow-card);
 }
 
@@ -899,10 +900,11 @@ onUnmounted(() => {
   width: 68px;
   min-height: 94px;
   padding: 10px 8px;
-  border: 1px solid rgba(109, 90, 74, 0.12);
+  border: 1px solid rgba(244, 164, 180, 0.22);
   border-radius: 14px;
-  background: linear-gradient(180deg, #fffdf8 0%, #f3eadb 100%);
-  color: #6d5a4a;
+  /* 二次元 pastel 粉白渐变封面背景 */
+  background: linear-gradient(180deg, #FFFDFE 0%, #F5E8EC 100%);
+  color: var(--text-secondary);
   overflow: hidden;
 }
 
@@ -912,7 +914,7 @@ onUnmounted(() => {
 }
 
 .bookshelf-item__cover--loading {
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 245, 247, 0.82);
 }
 
 .bookshelf-item__cover-image {
@@ -979,7 +981,7 @@ onUnmounted(() => {
   margin-top: 2px;
   padding: 3px 9px;
   border-radius: 999px;
-  background: rgba(184, 93, 54, 0.1);
+  background: rgba(244, 164, 180, 0.15);
   color: var(--primary-color);
   font-size: 12px;
   font-weight: 600;

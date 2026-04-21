@@ -138,7 +138,8 @@ function handleToggleTheme() {
   letter-spacing: 0.08em;
   color: white;
   background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
-  box-shadow: 0 12px 24px rgba(184, 93, 54, 0.24);
+  /* 二次元风格徽章阴影：粉色调弥散阴影 */
+  box-shadow: 0 12px 24px rgba(244, 164, 180, 0.28);
 }
 
 .app-layout__title {

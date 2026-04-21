@@ -198,6 +198,10 @@ export interface ApiReaderPreferences {
   paragraph_spacing: number;
   content_width: number;
   theme: "light" | "dark";
+  // 二次元 UI 主题扩展字段
+  theme_color: string;
+  border_radius: "soft" | "standard";
+  font_family: "lxgwwenkai" | "system";
 }
 
 export interface ApiUserPreferencesDocument {
@@ -221,6 +225,10 @@ export interface ApiReaderPreferencesPatch {
   paragraph_spacing?: number;
   content_width?: number;
   theme?: "light" | "dark";
+  // 二次元 UI 主题扩展字段（可选，不传则不修改）
+  theme_color?: string;
+  border_radius?: "soft" | "standard";
+  font_family?: "lxgwwenkai" | "system";
 }
 
 export interface ApiUserPreferencesPatchRequest {

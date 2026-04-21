@@ -23,7 +23,9 @@ frontend/vite.config.d.ts
 
 # Runtime data
 backend/data/
+backend/data-refactor/
 backend/uploads/
+backend/uploads-refactor/
 build/
 
 # Project-local AI memory

@@ -8,6 +8,7 @@ from app.models import User
 from app.schemas.preferences import UserPreferencesPatchRequest
 
 
+# 用户偏好默认值：包含书架、阅读器与二次元 UI 主题设置
 DEFAULT_USER_PREFERENCES = {
     "version": 1,
     "bookshelf": {
@@ -24,11 +25,18 @@ DEFAULT_USER_PREFERENCES = {
         "paragraph_spacing": 1.0,
         "content_width": 72,
         "theme": "light",
+        # 二次元 UI 主题默认值：樱花粉、大圆角、霞鹜文楷
+        "theme_color": "#F4A4B4",
+        "border_radius": "soft",
+        "font_family": "lxgwwenkai",
     },
 }
 
 ALLOWED_BOOK_SORTS = {"created_at", "recent_read", "title"}
 ALLOWED_READER_THEMES = {"light", "dark"}
+# 二次元 UI 主题允许取值集合，用于归一化时校验
+ALLOWED_UI_BORDER_RADIUS = {"soft", "standard"}
+ALLOWED_UI_FONT_FAMILY = {"lxgwwenkai", "system"}
 
 
 def get_user_preferences(user: User) -> tuple[dict[str, Any], bool]:
@@ -110,6 +118,18 @@ def _normalize_reader_preferences(payload: Any) -> dict[str, Any]:
     if theme in ALLOWED_READER_THEMES:
         normalized["theme"] = theme
 
+    # 二次元 UI 主题字段归一化：非法值回退到默认值，确保前端始终拿到合法数据
+    theme_color = raw_payload.get("theme_color")
+    normalized["theme_color"] = _normalize_hex_color(theme_color, normalized["theme_color"])
+
+    border_radius = raw_payload.get("border_radius")
+    if border_radius in ALLOWED_UI_BORDER_RADIUS:
+        normalized["border_radius"] = border_radius
+
+    font_family = raw_payload.get("font_family")
+    if font_family in ALLOWED_UI_FONT_FAMILY:
+        normalized["font_family"] = font_family
+
     return normalized
 
 
@@ -169,3 +189,22 @@ def _clamp_number(value: Any, minimum: float, maximum: float, fallback: float) -
     if normalized > maximum:
         return fallback
     return normalized
+
+
+def _normalize_hex_color(value: Any, fallback: str) -> str:
+    """校验并归一化十六进制颜色值。
+
+    仅接受 #RRGGBB 格式（大小写均可），非法输入回退到默认值。
+    成功校验后统一返回小写格式，避免前端因大小写差异产生重复渲染。
+    """
+    if not isinstance(value, str):
+        return fallback
+    # 去除首尾空白，防止用户误输入空格导致校验失败
+    trimmed = value.strip()
+    if len(trimmed) == 7 and trimmed.startswith("#"):
+        try:
+            int(trimmed[1:], 16)
+            return trimmed.lower()
+        except ValueError:
+            pass
+    return fallback

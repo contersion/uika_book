@@ -1337,9 +1337,10 @@ function goBack() {
   );
   min-height: 100dvh;
   padding: var(--reader-page-gutter);
+  /* 二次元阅读页背景：淡粉紫光晕叠加 */
   background:
-    radial-gradient(circle at 14% 10%, rgba(184, 93, 54, 0.16), transparent 22%),
-    radial-gradient(circle at 86% 16%, rgba(52, 107, 97, 0.12), transparent 24%),
+    radial-gradient(circle at 14% 10%, rgba(244, 164, 180, 0.14), transparent 22%),
+    radial-gradient(circle at 86% 16%, rgba(201, 177, 255, 0.12), transparent 24%),
     radial-gradient(circle at 50% 100%, rgba(255, 255, 255, 0.2), transparent 32%),
     var(--reader-page-bg);
   color: var(--reader-body);
@@ -1347,47 +1348,49 @@ function goBack() {
 
 .reader-page--light {
   color-scheme: light;
-  --reader-page-bg: linear-gradient(180deg, #f7efe2 0%, #efe3d0 100%);
-  --reader-panel-bg: rgba(255, 250, 243, 0.74);
-  --reader-panel-border: rgba(109, 90, 74, 0.12);
-  --reader-panel-shadow: 0 24px 60px rgba(82, 55, 28, 0.12);
+  /* 二次元粉白配色：樱花牛奶渐变背景 */
+  --reader-page-bg: linear-gradient(180deg, #FFF5F7 0%, #FFF0F3 100%);
+  --reader-panel-bg: rgba(255, 255, 255, 0.74);
+  --reader-panel-border: rgba(244, 164, 180, 0.18);
+  --reader-panel-shadow: 0 24px 60px rgba(244, 164, 180, 0.12);
   --reader-paper-bg:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 250, 243, 0.92)),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0));
-  --reader-paper-border: rgba(109, 90, 74, 0.12);
-  --reader-paper-shadow: 0 30px 80px rgba(82, 55, 28, 0.12);
-  --reader-heading: #2f241d;
-  --reader-body: #43362b;
-  --reader-muted: #7a6655;
-  --reader-accent: #b85d36;
-  --reader-progress-rail: rgba(184, 93, 54, 0.14);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 245, 247, 0.92)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0));
+  --reader-paper-border: rgba(244, 164, 180, 0.14);
+  --reader-paper-shadow: 0 30px 80px rgba(244, 164, 180, 0.12);
+  --reader-heading: #2D2D2D;
+  --reader-body: #3D3D3D;
+  --reader-muted: #8A8A8A;
+  --reader-accent: #F4A4B4;
+  --reader-progress-rail: rgba(244, 164, 180, 0.2);
   --reader-action-bg: rgba(255, 255, 255, 0.58);
   --reader-action-hover: rgba(255, 255, 255, 0.86);
-  --reader-settings-bg: rgba(255, 255, 255, 0.56);
-  --reader-settings-border: rgba(109, 90, 74, 0.08);
+  --reader-settings-bg: rgba(255, 245, 247, 0.56);
+  --reader-settings-border: rgba(244, 164, 180, 0.12);
 }
 
 .reader-page--dark {
   color-scheme: dark;
   background: var(--reader-page-bg);
-  --reader-page-bg: linear-gradient(180deg, #121212 0%, #101010 100%);
-  --reader-panel-bg: rgba(24, 24, 24, 0.94);
-  --reader-panel-border: rgba(243, 230, 215, 0.09);
+  /* 深夜花町配色：深蓝紫背景 */
+  --reader-page-bg: linear-gradient(180deg, #1A1A2E 0%, #141426 100%);
+  --reader-panel-bg: rgba(37, 37, 64, 0.94);
+  --reader-panel-border: rgba(255, 143, 171, 0.12);
   --reader-panel-shadow: 0 24px 64px rgba(0, 0, 0, 0.38);
   --reader-paper-bg:
-    linear-gradient(180deg, rgba(22, 22, 22, 0.98), rgba(22, 22, 22, 0.98)),
-    linear-gradient(135deg, rgba(22, 22, 22, 0.98), rgba(22, 22, 22, 0.98));
-  --reader-paper-border: rgba(243, 230, 215, 0.08);
+    linear-gradient(180deg, rgba(30, 30, 50, 0.98), rgba(30, 30, 50, 0.98)),
+    linear-gradient(135deg, rgba(30, 30, 50, 0.98), rgba(30, 30, 50, 0.98));
+  --reader-paper-border: rgba(255, 143, 171, 0.1);
   --reader-paper-shadow: 0 34px 88px rgba(0, 0, 0, 0.42);
-  --reader-heading: #f3e7d9;
-  --reader-body: #dccbbb;
-  --reader-muted: #baa795;
-  --reader-accent: #d68d5e;
-  --reader-progress-rail: rgba(214, 141, 94, 0.18);
+  --reader-heading: #FFF0F3;
+  --reader-body: #D8D8E8;
+  --reader-muted: #A0A0C0;
+  --reader-accent: #FF8FAB;
+  --reader-progress-rail: rgba(255, 143, 171, 0.22);
   --reader-action-bg: rgba(255, 255, 255, 0.04);
   --reader-action-hover: rgba(255, 255, 255, 0.08);
-  --reader-settings-bg: rgba(255, 255, 255, 0.04);
-  --reader-settings-border: rgba(243, 230, 215, 0.08);
+  --reader-settings-bg: rgba(255, 143, 171, 0.04);
+  --reader-settings-border: rgba(255, 143, 171, 0.1);
 }
 
 .reader-page--dark .reader-glass {
@@ -1707,7 +1710,7 @@ function goBack() {
   margin: 0 auto;
   border-radius: 22px;
   object-fit: contain;
-  box-shadow: 0 20px 48px rgba(35, 22, 12, 0.18);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.18);
 }
 
 .reader-content--dimmed {

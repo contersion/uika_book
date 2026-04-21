@@ -1,5 +1,6 @@
 ﻿<template>
-  <n-config-provider :theme="naiveTheme">
+  <!-- 全局 Naive UI 主题配置：注入二次元配色、圆角与字体覆盖 -->
+  <n-config-provider :theme="naiveTheme" :theme-overrides="naiveThemeOverrides">
     <n-global-style />
     <n-message-provider>
       <n-dialog-provider>
@@ -24,6 +25,7 @@
 
 <script setup lang="ts">
 import { computed, watch } from "vue";
+import type { GlobalThemeOverrides } from "naive-ui";
 import {
   NConfigProvider,
   NDialogProvider,
@@ -44,6 +46,50 @@ const appThemeStore = useAppThemeStore();
 const preferencesStore = usePreferencesStore();
 const appThemeClass = computed(() => `app-theme--${appThemeStore.theme}`);
 const naiveTheme = computed(() => (appThemeStore.theme === "dark" ? darkTheme : null));
+
+/** 根据用户二次元偏好动态构建 Naive UI 主题覆盖配置 */
+const naiveThemeOverrides = computed<GlobalThemeOverrides>(() => {
+  const primary = preferencesStore.reader.themeColor || "#f4a4b4";
+  const isSoft = preferencesStore.reader.borderRadius === "soft";
+  const baseRadius = isSoft ? "12px" : "8px";
+  const cardRadius = isSoft ? "20px" : "12px";
+  const fontFamily = preferencesStore.reader.fontFamily === "lxgwwenkai"
+    ? '"LXGW WenKai", "PingFang SC", "Microsoft YaHei", sans-serif'
+    : '"PingFang SC", "Microsoft YaHei", sans-serif';
+
+  return {
+    common: {
+      primaryColor: primary,
+      primaryColorHover: primary,
+      primaryColorPressed: primary,
+      primaryColorSuppl: primary,
+      borderRadius: baseRadius,
+      borderRadiusSmall: isSoft ? "8px" : "6px",
+      fontFamily,
+    },
+    Button: {
+      borderRadiusSmall: baseRadius,
+      borderRadiusMedium: baseRadius,
+      borderRadiusLarge: isSoft ? "16px" : "10px",
+    },
+    Card: {
+      borderRadius: cardRadius,
+    },
+    Modal: {
+      borderRadius: cardRadius,
+    },
+    Input: {
+      borderRadius: baseRadius,
+    },
+    Slider: {
+      fillColor: primary,
+      fillColorHover: primary,
+    },
+    Progress: {
+      lineBgProcessing: primary,
+    },
+  };
+});
 
 watch(
   () => preferencesStore.reader.theme,
