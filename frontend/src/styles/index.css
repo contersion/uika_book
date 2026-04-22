@@ -14,10 +14,8 @@
     "Times New Roman",
     "STSong",
     serif;
-  /* 粉白二次元浅色背景：樱花牛奶渐变 + 淡粉紫光晕 */
+  /* 粉白二次元浅色背景：樱花牛奶渐变 */
   --app-background:
-    radial-gradient(circle at top left, rgba(244, 164, 180, 0.18), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(201, 177, 255, 0.14), transparent 30%),
     linear-gradient(180deg, #FFF5F7 0%, #FFF0F3 100%);
   --app-shell-color: #FFF0F3;
   /* 表面色：纯白与极淡粉，保持干净清爽 */
@@ -28,7 +26,7 @@
   --surface-header-bg: rgba(255, 255, 255, 0.88);
   --surface-panel-bg: rgba(255, 255, 255, 0.72);
   --surface-panel-soft-bg: rgba(255, 245, 247, 0.56);
-  --surface-card-bg: rgba(255, 255, 255, 0.86);
+  --surface-card-bg: #FFFFFF;
   --surface-input-bg: rgba(255, 245, 247, 0.68);
   --surface-empty-bg: rgba(255, 245, 247, 0.78);
   --surface-stat-bg: rgba(255, 240, 243, 0.64);
@@ -47,12 +45,12 @@
   --primary-soft: rgba(244, 164, 180, 0.18);
   --accent-color: #C9B1FF;
   --text-primary: #2D2D2D;
-  --text-secondary: #7A7A7A;
-  --border-color: rgba(244, 164, 180, 0.22);
-  --border-color-soft: rgba(244, 164, 180, 0.14);
+  --text-secondary: #5A5A5A;
+  --border-color: rgba(244, 164, 180, 0.32);
+  --border-color-soft: rgba(244, 164, 180, 0.18);
   /* 阴影基调改为带粉色调的弥散阴影 */
   --shadow-soft: 0 12px 30px rgba(244, 164, 180, 0.1);
-  --shadow-card: 0 16px 36px rgba(244, 164, 180, 0.12);
+  --shadow-card: 0 16px 40px rgba(244, 164, 180, 0.20);
   --shadow-modal: 0 24px 60px rgba(244, 164, 180, 0.16);
   /* 圆角系统：二次元风格使用更圆润的大圆角 */
   --radius-sm: 10px;
@@ -80,7 +78,7 @@
   --button-secondary-bg: #f3f4f6;
   --button-secondary-text: #111827;
   --button-secondary-hover: #e5e7eb;
-  --button-secondary-border: transparent;
+  --button-secondary-border: rgba(244, 164, 180, 0.25);
   --button-ghost-text: #111827;
   --button-ghost-hover: #f3f4f6;
   --button-outline-border: #e5e7eb;
@@ -119,7 +117,7 @@
   --alert-success-text: #15803d;
   --alert-success-border: #bbf7d0;
   /* Slider 颜色 */
-  --slider-track-bg: #e5e7eb;
+  --slider-track-bg: rgba(244, 164, 180, 0.30);
   --slider-range-bg: #111827;
   --slider-thumb-bg: #ffffff;
   --slider-thumb-border: #e5e7eb;

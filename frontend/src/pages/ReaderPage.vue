@@ -1837,21 +1837,42 @@ function goToBookshelf() {
   margin-top: 18px;
 }
 
+.reader-catalog__list {
+  scrollbar-width: thin;
+}
+
+.reader-page--light .reader-catalog__list {
+  scrollbar-color: rgba(244, 164, 180, 0.5) transparent;
+}
+
+.reader-page--dark .reader-catalog__list {
+  scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+}
+
 .reader-catalog__list::-webkit-scrollbar {
-  width: 5px;
+  width: 6px;
 }
 
 .reader-catalog__list::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.reader-catalog__list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
+.reader-page--light .reader-catalog__list::-webkit-scrollbar-thumb {
+  background: rgba(244, 164, 180, 0.5);
   border-radius: 999px;
 }
 
-.reader-catalog__list::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.32);
+.reader-page--light .reader-catalog__list::-webkit-scrollbar-thumb:hover {
+  background: rgba(244, 164, 180, 0.7);
+}
+
+.reader-page--dark .reader-catalog__list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+}
+
+.reader-page--dark .reader-catalog__list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .reader-catalog__item {
