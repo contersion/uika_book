@@ -2,7 +2,7 @@ services:
   backend:
     build:
       context: ./backend
-    container_name: txt-reader-backend-refactor
+    container_name: uika_book-backend
     restart: unless-stopped
     environment:
       APP_NAME: ${APP_NAME:-初华的书 API}
@@ -31,7 +31,7 @@ services:
       context: ./frontend
       args:
         VITE_API_BASE_URL: "${VITE_API_BASE_URL:-}"
-    container_name: txt-reader-frontend-refactor
+    container_name: uika_book-frontend
     depends_on:
       - backend
     restart: unless-stopped

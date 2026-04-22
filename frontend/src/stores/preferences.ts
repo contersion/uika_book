@@ -13,7 +13,7 @@ import type {
 } from "../types/api";
 
 
-const LEGACY_READER_PREFERENCES_KEY = "txt-reader.preferences";
+const LEGACY_READER_PREFERENCES_KEY = "uika_book.preferences";
 const SAVE_DEBOUNCE_MS = 450;
 
 export interface BookshelfPreferencesState {

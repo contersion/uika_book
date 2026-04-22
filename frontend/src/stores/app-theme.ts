@@ -2,8 +2,8 @@ import { defineStore } from "pinia";
 
 export type AppThemeMode = "light" | "dark";
 
-const APP_THEME_STORAGE_KEY = "txt-reader.app-theme";
-const LEGACY_READER_PREFERENCES_KEY = "txt-reader.preferences";
+const APP_THEME_STORAGE_KEY = "uika_book.app-theme";
+const LEGACY_READER_PREFERENCES_KEY = "uika_book.preferences";
 const APP_THEME_CLASS_PREFIX = "app-theme--";
 
 function normalizeTheme(value: unknown): AppThemeMode {

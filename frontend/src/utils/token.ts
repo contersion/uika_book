@@ -1,6 +1,6 @@
 import { getActiveBackendId, loadBackendConfig } from "./backend";
 
-const LEGACY_TOKEN_STORAGE_KEY = "txt-reader/token";
+const LEGACY_TOKEN_STORAGE_KEY = "uika_book/token";
 
 function buildScopedTokenStorageKey(backendId: string) {
   return `${LEGACY_TOKEN_STORAGE_KEY}/${encodeURIComponent(backendId)}`;

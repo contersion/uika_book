@@ -10,8 +10,8 @@ export interface BackendNotice {
   text: string;
 }
 
-const BACKEND_CONFIG_STORAGE_KEY = "txt-reader/backend-config";
-const BACKEND_NOTICE_STORAGE_KEY = "txt-reader/backend-notice";
+const BACKEND_CONFIG_STORAGE_KEY = "uika_book/backend-config";
+const BACKEND_NOTICE_STORAGE_KEY = "uika_book/backend-notice";
 const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 function isLoopbackHostname(hostname: string) {

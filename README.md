@@ -72,8 +72,8 @@
 先克隆仓库并进入项目目录：
 
 ```bash
-git clone https://github.com/contersion/local_txt_reader.git
-cd local_txt_reader
+git clone https://github.com/contersion/uika_book.git
+cd uika_book
 ```
 
 ### 2. 准备环境变量
