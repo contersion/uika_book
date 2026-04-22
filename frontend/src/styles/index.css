@@ -123,6 +123,16 @@
   --slider-range-bg: #111827;
   --slider-thumb-bg: #ffffff;
   --slider-thumb-border: #e5e7eb;
+  /* Dialog 颜色 */
+  --dialog-bg: #ffffff;
+  --dialog-border: #e5e7eb;
+  /* Select 颜色 */
+  --select-trigger-border: #e5e7eb;
+  --select-content-bg: #ffffff;
+  --select-content-border: #e5e7eb;
+  --select-content-text: #111827;
+  --select-item-focus-bg: #f3f4f6;
+  --select-item-focus-text: #111827;
 }
 
 body.app-theme--dark {
@@ -217,6 +227,16 @@ body.app-theme--dark {
   --slider-range-bg: #ffffff;
   --slider-thumb-bg: #ffffff;
   --slider-thumb-border: rgba(255, 255, 255, 0.2);
+  /* Dialog 暗色模式 */
+  --dialog-bg: rgba(37, 37, 64, 0.96);
+  --dialog-border: var(--border-color-soft);
+  /* Select 暗色模式 */
+  --select-trigger-border: var(--border-color-soft);
+  --select-content-bg: rgba(37, 37, 64, 0.96);
+  --select-content-border: var(--border-color-soft);
+  --select-content-text: var(--text-primary);
+  --select-item-focus-bg: rgba(255, 255, 255, 0.06);
+  --select-item-focus-text: var(--text-primary);
 }
 
 body.app-theme--light {
@@ -375,4 +395,37 @@ body.app-theme--dark .login-page__card input {
 
 body.app-theme--dark .login-page__card input::placeholder {
   color: var(--text-secondary);
+}
+
+body.app-theme--dark .backend-switcher__radio {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+}
+
+body.app-theme--dark .backend-switcher__radio:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+body.app-theme--dark .backend-switcher__radio--active {
+  background: rgba(255, 143, 171, 0.1);
+  color: var(--primary-color);
+}
+
+body.app-theme--dark .rule-form__textarea {
+  background: var(--surface-input-bg);
+  color: var(--text-primary);
+}
+
+body.app-theme--dark .rule-form__radio {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+}
+
+body.app-theme--dark .rule-form__radio:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+body.app-theme--dark .rule-form__radio--active {
+  background: rgba(255, 143, 171, 0.1);
+  color: var(--primary-color);
 }

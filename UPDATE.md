@@ -1,3 +1,46 @@
+## v1.07
+
+Date
+`2026-04-22`
+
+Summary
+本次版本是一次聚焦夜间模式完整适配与阅读页交互优化的补丁更新，全部基于最小改动原则完成：
+- 修复 Naive UI → Shadcn Vue 迁移后遗留的全局暗色模式失效问题（Button、Badge、Alert、Input、Slider、Dialog、Select 等全部 shadcn 组件）。
+- 修复阅读页 Input 组件 `v-model` 双向绑定失效导致的登录页无法登录（P0 BUG）。
+- 优化阅读页交互：新增"返回书架"快捷入口、简化进度面板信息。
+- 修复弹窗/下拉栏在夜间模式下的透明度问题。
+
+Frontend
+- 全局暗色模式配色修复（所有 shadcn 组件统一使用 CSS 变量）：
+  - `Button`：硬编码 `bg-gray-100` / `text-gray-900` → CSS 变量 `--button-*`，夜间 secondary/ghost/link/outline 全部适配。
+  - `Badge`：硬编码 `bg-gray-100` / `text-gray-900` / `bg-blue-50` 等 → CSS 变量 `--badge-*`，夜间半透明暗色背景。
+  - `Alert`：硬编码 `bg-blue-50` / `bg-amber-50` / `bg-green-50` → CSS 变量 `--alert-*`，夜间半透明主题色背景。
+  - `Input`：硬编码 `border-gray-200` / `placeholder:text-gray-400` → CSS 变量，夜间深色输入框。
+  - `Slider`：硬编码 `bg-gray-200` / `bg-gray-900` / `bg-white` → CSS 变量 `--slider-*`，夜间白色滑块 + 半透明轨道。
+  - `DialogContent`：硬编码 `bg-white` / `border-gray-200` → CSS 变量 `--dialog-*`，夜间深紫背景。
+  - `SelectTrigger` / `SelectContent` / `SelectItem`：硬编码 `bg-white` / `text-gray-900` / `focus:bg-gray-100` → CSS 变量 `--select-*`，夜间深紫背景 + 浅色文字。
+- 页面级暗色模式覆盖（`index.css`）：
+  - 书架页搜索框：`--surface-input-bg` 暗色背景。
+  - 书架页表格 hover：`rgba(244, 164, 180, 0.14)`（白天）/ `rgba(255, 143, 171, 0.06)`（夜间）。
+  - 登录页卡片文字：`var(--text-primary)`。
+  - 登录页输入框：`var(--surface-input-bg)` 背景 + `var(--text-primary)` 文字。
+  - 阅读页进度条：`#ffffff` fill + `rgba(255,255,255,0.12)` 轨道（夜间）。
+  - 目录规则页 `.rule-form__textarea` / `.rule-form__radio` / `.backend-switcher__radio` 暗色覆盖。
+- 弹窗透明度修正：
+  - Dialog / Select 夜间背景从 `var(--surface-panel-bg)`（`rgba(255,255,255,0.06)`，几乎透明）调整为 `rgba(37, 37, 64, 0.96)`（深紫，96% 不透明）。
+- P0 BUG 修复：
+  - `Input.vue` 组件缺失 `v-model` 支持，用户输入无法同步到表单 → 添加 `defineModel<string>()`，登录页恢复正常。
+- 阅读页交互优化：
+  - 右侧浮动面板删除冗余进度信息（"已同步到云端 12% · 第 X 章"），仅保留"已同步/未同步"。
+  - 左侧浮窗（`reader-rail`）新增"返回书架"按钮，点击跳转书架页。PC 与移动端同步生效。
+
+Verification
+- 前端 `npm run build` 零错误通过（`vue-tsc -b && vite build`）。
+- Docker 前端镜像重建验证通过：
+  - `docker compose up -d --build`
+  - 前端 `http://localhost:21413` 正常访问
+  - 后端 `http://localhost:9000` 正常访问
+
 ## v1.06
 
 Date
