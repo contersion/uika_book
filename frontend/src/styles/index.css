@@ -429,3 +429,12 @@ body.app-theme--dark .rule-form__radio--active {
   background: rgba(255, 143, 171, 0.1);
   color: var(--primary-color);
 }
+
+body.app-theme--dark .group-manager__create {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+body.app-theme--dark .group-manager__item {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.06);
+}
