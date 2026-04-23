@@ -968,14 +968,7 @@ onUnmounted(() => {
 }
 
 .bookshelf-item__badge {
-  flex-shrink: 0;
-  margin-top: 2px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: rgba(74, 159, 217, 0.15);
-  color: var(--primary-color);
-  font-size: 12px;
-  font-weight: 600;
+  display: none;
 }
 
 .bookshelf-item__status-row,
@@ -1142,7 +1135,6 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
   }
 
-  .bookshelf-item__badge,
   .bookshelf-item__facts {
     display: none;
   }
