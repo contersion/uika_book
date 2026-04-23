@@ -39,8 +39,8 @@ Frontend
 Verification
 - Docker 构建验证通过：
   - `docker compose up -d --build`
-  - 前端 `http://localhost:21412` 正常访问
-  - 后端 `http://localhost:7001/health` 正常访问
+  - 前端 `http://localhost:7234` 正常访问
+  - 后端 `http://localhost:8234/health` 正常访问
   - 域名穿透场景下登录、书架、阅读、进度同步均正常
 
 ## v1.08
