@@ -159,9 +159,20 @@ async function request<T>(path: string, options: RequestOptions = {}) {
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("[API] fetch failed:", { url: requestUrl, method, error });
-    const message = error instanceof DOMException && error.name === "AbortError"
-      ? "请求已取消"
-      : "无法连接到后端服务，请确认后端已启动";
+
+    let message: string;
+
+    if (error instanceof DOMException && error.name === "AbortError") {
+      message = "请求已取消";
+    } else if (
+      typeof window !== "undefined" &&
+      window.location.protocol === "https:" &&
+      requestUrl.startsWith("http://")
+    ) {
+      message = "当前页面通过 HTTPS 访问，无法连接 HTTP 后端。远程后端必须使用 https://，或将前端改为 HTTP 访问。";
+    } else {
+      message = "无法连接到后端服务，请确认后端已启动";
+    }
 
     throw new ApiError(message, 0, "NETWORK_ERROR", error);
   }
