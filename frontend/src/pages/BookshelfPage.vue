@@ -418,6 +418,10 @@ async function loadGroups() {
 
 async function loadPage() {
   await Promise.all([loadBooks(appliedSearch.value), loadGroups()]);
+  // 数据加载完成后再次强制回到顶部，防止异步内容渲染后滚动位置被撑开
+  if (typeof window !== "undefined") {
+    window.scrollTo(0, 0);
+  }
 }
 
 function handleSearch() {
@@ -598,6 +602,7 @@ function handleMetadataUpdated() {
 onMounted(() => {
   if (typeof window !== "undefined") {
     window.addEventListener(BOOK_METADATA_UPDATED_EVENT, handleMetadataUpdated);
+    window.scrollTo(0, 0);
   }
 
   void loadPage();

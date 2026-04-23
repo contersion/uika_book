@@ -704,7 +704,9 @@ function getLocalProgressKey(bookId: number): string {
 function saveProgressToLocal(bookId: number, snapshot: ProgressSnapshot) {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(getLocalProgressKey(bookId), JSON.stringify(snapshot));
+    const payload = JSON.stringify(snapshot);
+    localStorage.setItem(getLocalProgressKey(bookId), payload);
+    sessionStorage.setItem(getLocalProgressKey(bookId), payload);
   } catch {
     // ignore
   }
@@ -713,7 +715,8 @@ function saveProgressToLocal(bookId: number, snapshot: ProgressSnapshot) {
 function loadProgressFromLocal(bookId: number): ProgressSnapshot | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(getLocalProgressKey(bookId));
+    const raw = sessionStorage.getItem(getLocalProgressKey(bookId))
+      || localStorage.getItem(getLocalProgressKey(bookId));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<ProgressSnapshot>;
     if (
@@ -734,6 +737,7 @@ function clearProgressLocal(bookId: number) {
   if (typeof window === "undefined") return;
   try {
     localStorage.removeItem(getLocalProgressKey(bookId));
+    sessionStorage.removeItem(getLocalProgressKey(bookId));
   } catch {
     // ignore
   }
@@ -1118,35 +1122,51 @@ function syncSessionProgressFromViewport() {
 }
 
 async function restoreScrollForCharOffset(charOffset: number, smoothScroll = false) {
-  await nextTick();
+  // 多轮重试，确保 DOM 和字体渲染完成后再计算 scroll 位置
+  let attempts = 0;
+  const maxAttempts = 5;
 
-  // 如果 DOM 还没渲染完，等一帧再试
-  if (!contentRef.value) {
-    await new Promise((resolve) => requestAnimationFrame(resolve));
+  while (attempts < maxAttempts) {
     await nextTick();
-  }
 
-  if (typeof window === "undefined" || !contentRef.value || !currentChapter.value) {
+    if (!contentRef.value) {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      attempts++;
+      continue;
+    }
+
+    if (typeof window === "undefined" || !currentChapter.value) {
+      return;
+    }
+
+    const renderedLength = currentChapterBody.value.length;
+    if (renderedLength <= 0) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      attempts++;
+      continue;
+    }
+
+    const adjustedCharOffset = clamp(
+      charOffset - currentChapterTrimmedPrefixLength.value,
+      0,
+      renderedLength,
+    );
+    const ratio = clamp(adjustedCharOffset / renderedLength, 0, 1);
+    const rect = contentRef.value.getBoundingClientRect();
+    const elementTop = rect.top + window.scrollY;
+    const scrollableHeight = Math.max(
+      contentRef.value.scrollHeight - window.innerHeight * 0.58,
+      0,
+    );
+    const targetTop = Math.max(0, elementTop - READER_SCROLL_ANCHOR + scrollableHeight * ratio);
+
+    suppressScrollTrackingUntil = Date.now() + (smoothScroll ? 900 : 420);
+    window.scrollTo({
+      top: targetTop,
+      behavior: smoothScroll ? "smooth" : "auto",
+    });
     return;
   }
-
-  const renderedLength = currentChapterBody.value.length;
-  const adjustedCharOffset = clamp(
-    charOffset - currentChapterTrimmedPrefixLength.value,
-    0,
-    Math.max(renderedLength, 0),
-  );
-  const ratio = renderedLength > 0 ? clamp(adjustedCharOffset / renderedLength, 0, 1) : 0;
-  const rect = contentRef.value.getBoundingClientRect();
-  const elementTop = rect.top + window.scrollY;
-  const scrollableHeight = Math.max(contentRef.value.scrollHeight - window.innerHeight * 0.58, 0);
-  const targetTop = Math.max(0, elementTop - READER_SCROLL_ANCHOR + scrollableHeight * ratio);
-
-  suppressScrollTrackingUntil = Date.now() + (smoothScroll ? 900 : 420);
-  window.scrollTo({
-    top: targetTop,
-    behavior: smoothScroll ? "smooth" : "auto",
-  });
 }
 
 async function loadProgressSafely(bookId: number) {
@@ -1201,11 +1221,35 @@ async function loadReader() {
     bookTitle.value = bookDetail?.title || cachedBookDetail?.title || "";
     chapters.value = chapterList;
 
-    // 合并后端进度和本地备份，优先使用本地备份（当前设备最新状态）
+    // 合并后端进度和本地备份
     const localProgress = loadProgressFromLocal(props.bookId);
-    const mergedProgress = localProgress || latestProgress || null;
 
-    progress.value = mergedProgress ? toProgressSnapshot(mergedProgress as ReadingProgress) : null;
+    // 智能选择最优进度：
+    // 1. 如果 URL 带 chapterIndex（从书架/详情页跳转过来），优先信任后端进度，
+    //    因为后端是持久化源，localStorage 可能因竞态或 contentRef 不可用时保存了 0
+    // 2. 如果是直接打开阅读页（无 chapterIndex），优先用 localStorage（最新设备状态）
+    const routeState = getRouteChapterState();
+    const shouldUseRouteChapter = routeState.provided && routeState.valid;
+
+    let mergedProgress: ProgressSnapshot | null = null;
+    if (shouldUseRouteChapter && latestProgress) {
+      // 从书架/详情页跳转：后端优先，但 local 若更新则兜底
+      const serverSnapshot = toProgressSnapshot(latestProgress);
+      if (localProgress && localProgress.chapter_index === serverSnapshot.chapter_index) {
+        // 同一章节：如果 local 的 char_offset 为 0 但 server 有值，说明 local 可能是在
+        // 导航瞬间 contentRef 不可用时保存的，此时应信任 server
+        mergedProgress =
+          localProgress.char_offset === 0 && serverSnapshot.char_offset > 0
+            ? serverSnapshot
+            : localProgress;
+      } else {
+        mergedProgress = serverSnapshot;
+      }
+    } else {
+      mergedProgress = localProgress || (latestProgress ? toProgressSnapshot(latestProgress) : null);
+    }
+
+    progress.value = mergedProgress;
     lastSavedProgressKey = mergedProgress ? getProgressKey(mergedProgress) : "";
 
     // 如果使用了缓存，后台静默刷新最新数据
@@ -1224,8 +1268,6 @@ async function loadReader() {
       return;
     }
 
-    const routeState = getRouteChapterState();
-    const shouldUseRouteChapter = routeState.provided && routeState.valid;
     const requestedIndex = shouldUseRouteChapter
       ? routeState.value
       : mergedProgress?.chapter_index ?? 0;
@@ -1507,7 +1549,22 @@ function handleNextChapter() {
 }
 
 function saveSnapshotBeforeNavigate(reason: string) {
-  const snapshot = captureCurrentProgressSnapshot();
+  // 强制同步最新视口进度，确保 snapshot 不是旧的
+  syncSessionProgressFromViewport();
+  let snapshot = sessionProgress.value ?? captureCurrentProgressSnapshot();
+
+  // 防御性处理：如果当前 snapshot 的 char_offset 为 0，但 sessionProgress 之前记录过
+  // 非零值，说明可能是 contentRef 不可用或视口计算异常导致的，应保留历史最大值
+  if (
+    snapshot &&
+    snapshot.char_offset === 0 &&
+    sessionProgress.value &&
+    sessionProgress.value.char_offset > 0 &&
+    snapshot.chapter_index === sessionProgress.value.chapter_index
+  ) {
+    snapshot = sessionProgress.value;
+  }
+
   if (snapshot) {
     saveProgressToLocal(props.bookId, snapshot);
     void flushProgress(reason, { snapshot, force: true, keepalive: true });
@@ -1615,10 +1672,6 @@ function goToBookshelf() {
   backdrop-filter: none;
 }
 
-.reader-page--dark .reader-paper::before {
-  display: none;
-}
-
 .reader-shell {
   position: relative;
 }
@@ -1662,7 +1715,8 @@ function goToBookshelf() {
   box-shadow: var(--reader-paper-shadow);
 }
 
-.reader-paper::before {
+/* 只在日间模式下显示纸张顶部高光，避免夜间模式白线 */
+.reader-page--light .reader-paper::before {
   content: "";
   position: absolute;
   inset: 0;

@@ -10,8 +10,13 @@ import { pinia } from "../stores";
 import { useAuthStore } from "../stores/auth";
 import { usePreferencesStore } from "../stores/preferences";
 
+if (typeof window !== "undefined" && "scrollRestoration" in history) {
+  history.scrollRestoration = "manual";
+}
+
 const router = createRouter({
   history: createWebHistory(),
+  scrollBehavior: () => ({ top: 0 }),
   routes: [
     {
       path: "/login",
