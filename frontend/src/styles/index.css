@@ -251,6 +251,8 @@ body,
   min-height: 100%;
   /* 继承 body 背景色，防止任何情况下透出底层白色 */
   background: inherit;
+  /* 确保 #app 始终填满视口高度，不留空隙 */
+  min-height: 100dvh;
 }
 
 html,
@@ -258,8 +260,14 @@ body {
   margin: 0;
 }
 
+html {
+  /* 兜底背景色：防止任何情况下透出白色 */
+  background-color: #1A1A2E;
+}
+
 body {
   background: var(--app-background);
+  background-color: #1A1A2E;
   color: var(--text-primary);
   line-height: 1.5;
   transition:

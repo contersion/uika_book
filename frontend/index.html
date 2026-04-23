@@ -6,10 +6,17 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#4A9FD9" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#1A1A2E" media="(prefers-color-scheme: dark)" />
+    <!-- theme-color 使用蓝色：Chrome 安卓 PWA 加载进度条颜色由 theme-color 决定。
+         深色 theme-color 会导致进度条显示为白色/浅灰（对比色），非常刺眼。
+         使用蓝色可让进度条恢复 Chrome 默认蓝色，在深浅背景下都更自然。 -->
+    <meta name="theme-color" content="#4A9FD9" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <!-- 内联兜底：确保 CSS 加载完成前页面背景为深色，消除 PWA 启动/刷新时顶部安全区域的白线闪白。
+         不用 !important，让外部 CSS 加载后正常覆盖（light 模式恢复浅色，dark 模式保持深色）。 -->
+    <style>
+      html, body { background-color: #1A1A2E; }
+    </style>
     <meta name="apple-mobile-web-app-title" content="初华的书" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

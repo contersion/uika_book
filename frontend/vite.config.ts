@@ -9,12 +9,15 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       manifest: {
+        id: "/",
         name: "初华的书",
         short_name: "初华的书",
         description: "个人 TXT 在线阅读器",
+        // theme_color 使用蓝色：Chrome 安卓 PWA 加载进度条颜色由 theme-color 决定，
+        // 深色会导致进度条显示为白色/浅灰（对比色）。蓝色可让进度条恢复 Chrome 默认色。
         theme_color: "#4A9FD9",
-        background_color: "#D6ECFA",
-        display: "fullscreen",
+        background_color: "#141426",
+        display: "standalone",
         orientation: "portrait",
         scope: "/",
         start_url: "/",

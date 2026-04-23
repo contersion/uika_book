@@ -1675,16 +1675,16 @@ function goToBookshelf() {
 
 .reader-page--dark {
   color-scheme: dark;
+  /* 纯色背景兜底，彻底消除渐变 banding 和跨设备渲染差异 */
+  background-color: #141426;
   background: var(--reader-page-bg);
-  /* 深夜花町配色：深蓝紫背景 */
-  --reader-page-bg: linear-gradient(180deg, #1A1A2E 0%, #141426 100%);
+  /* 深夜花町配色：深蓝紫纯色背景，避免渐变带来的边缘渲染差异 */
+  --reader-page-bg: #1A1A2E;
   --reader-panel-bg: rgba(37, 37, 64, 0.94);
   /* 夜间模式下边框改为透明，彻底杜绝白线/粉线 */
   --reader-panel-border: transparent;
   --reader-panel-shadow: 0 24px 64px rgba(0, 0, 0, 0.38);
-  --reader-paper-bg:
-    linear-gradient(180deg, rgba(30, 30, 50, 0.98), rgba(30, 30, 50, 0.98)),
-    linear-gradient(135deg, rgba(30, 30, 50, 0.98), rgba(30, 30, 50, 0.98));
+  --reader-paper-bg: #1E1E32;
   --reader-paper-border: transparent;
   --reader-paper-shadow: 0 34px 88px rgba(0, 0, 0, 0.42);
   --reader-heading: #FFF0F3;
@@ -1738,6 +1738,8 @@ function goToBookshelf() {
   background: var(--reader-panel-bg);
   box-shadow: var(--reader-panel-shadow);
   backdrop-filter: blur(18px);
+  /* 消除 WebKit border-radius 抗锯齿亮边 */
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 
 .reader-paper {
@@ -1766,6 +1768,8 @@ function goToBookshelf() {
     linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 18%),
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.12), transparent 28%);
   pointer-events: none;
+  /* 确保伪元素也应用 GPU 层，避免合成差异 */
+  transform: translateZ(0);
 }
 
 .reader-page__alert {

@@ -11,6 +11,14 @@ import "./styles/tailwind.css";
 
 installGlobalErrorHandling();
 
+// PWA Service Worker 更新检测：当 SW 更新后自动刷新页面
+// 避免 PC 端触发 SW 更新后，安卓 PWA 加载新旧资源混合导致渲染异常（如白线）
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    window.location.reload();
+  });
+}
+
 const app = createApp(App);
 
 app.config.errorHandler = (error) => {
