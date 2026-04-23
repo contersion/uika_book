@@ -164,25 +164,8 @@ async function request<T>(path: string, options: RequestOptions = {}) {
 
     if (error instanceof DOMException && error.name === "AbortError") {
       message = "请求已取消";
-    } else if (
-      typeof window !== "undefined" &&
-      window.location.protocol === "https:" &&
-      requestUrl.startsWith("http://")
-    ) {
-      message = "当前页面通过 HTTPS 访问，无法连接 HTTP 后端。远程后端必须使用 https://，或将前端改为 HTTP 访问。";
     } else if (requestUrl.startsWith("https://")) {
-      // 尝试用 HTTP 探测，甄别后端是否只支持 HTTP 而未配置 HTTPS
-      const httpProbeUrl = requestUrl.replace(/^https:/, "http:");
-      const probeController = new AbortController();
-      const probeTimeout = setTimeout(() => probeController.abort(), 3000);
-      try {
-        await fetch(httpProbeUrl, { method: "HEAD", mode: "no-cors", signal: probeController.signal });
-        message = "该后端似乎没有配置 HTTPS，请尝试使用 http:// 地址访问。";
-      } catch {
-        message = "无法连接到后端服务，请确认后端地址正确且服务已启动。";
-      } finally {
-        clearTimeout(probeTimeout);
-      }
+      message = "无法建立 HTTPS 连接。请确认后端地址正确、服务已启动，且 SSL/TLS 配置有效。";
     } else {
       message = "无法连接到后端服务，请确认后端已启动";
     }
