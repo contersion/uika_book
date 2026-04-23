@@ -7,7 +7,7 @@ services:
     environment:
       APP_NAME: ${APP_NAME:-初华的书 API}
       APP_VERSION: ${APP_VERSION:-0.1.0}
-      DEBUG: ${DEBUG:-false}
+      DEBUG: false
       HOST: 0.0.0.0
       PORT: 8000
       API_V1_PREFIX: ${API_V1_PREFIX:-/api/v1}
