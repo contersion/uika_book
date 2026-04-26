@@ -17,7 +17,7 @@ export default defineConfig({
         // 使用蓝色使进度条保持 Chrome 默认蓝色，避免深色 theme_color 导致白色对比色进度条。
         theme_color: "#4A9FD9",
         background_color: "#141426",
-        display: "fullscreen",
+        display: "standalone",
         orientation: "portrait",
         scope: "/",
         start_url: "/",
