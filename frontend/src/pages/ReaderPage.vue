@@ -227,6 +227,19 @@
             ></div>
           </div>
 
+          <div class="reader-catalog__jump">
+            <div class="reader-catalog__jump-label">
+              <span>快速跳转</span>
+              <strong>第 {{ catalogJumpDisplay }} 章</strong>
+            </div>
+            <Slider
+              v-model="catalogJumpIndex"
+              :min="0"
+              :max="Math.max(0, chapters.length - 1)"
+              :step="1"
+            />
+          </div>
+
             <div
               ref="catalogListRef"
               class="reader-catalog__list reader-catalog__list--drawer"
@@ -435,6 +448,7 @@ const viewportWidth = ref(COMPACT_BREAKPOINT + 200);
 const catalogItemRefs = new Map<number, HTMLElement>();
 const catalogScrollTop = ref(0);
 const catalogListHeight = ref(0);
+const catalogJumpIndex = ref(0);
 
 let progressSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let saveInFlight = false;
@@ -545,6 +559,7 @@ const syncedProgressLabel = computed(() => {
 });
 const canGoPrev = computed(() => currentChapterIndex.value > 0);
 const canGoNext = computed(() => currentChapterIndex.value < chapters.value.length - 1);
+const catalogJumpDisplay = computed(() => catalogJumpIndex.value + 1);
 const readerStyleVars = computed(() => ({
   "--reader-font-size": `${preferences.fontSize}px`,
   "--reader-line-height": String(preferences.lineHeight),
@@ -630,7 +645,27 @@ watch(
       return;
     }
 
+    catalogJumpIndex.value = currentChapterIndex.value;
     void scheduleCatalogAutoScroll();
+  },
+);
+
+watch(
+  catalogJumpIndex,
+  (index) => {
+    const catalogList = catalogListRef.value;
+    if (!catalogList || chapters.value.length === 0) {
+      return;
+    }
+
+    if (chapters.value.length > 200) {
+      catalogList.scrollTop = index * CATALOG_ITEM_ESTIMATED_HEIGHT;
+    } else {
+      const targetItem = catalogItemRefs.get(index);
+      if (targetItem) {
+        targetItem.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    }
   },
 );
 
@@ -648,6 +683,7 @@ watch(
       return;
     }
 
+    catalogJumpIndex.value = value;
     void scheduleCatalogAutoScroll();
   },
 );
@@ -2120,7 +2156,7 @@ function goToBookshelf() {
   gap: 10px;
   min-height: 0;
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: 12px;
 }
 
 .reader-catalog__list--drawer {
@@ -2129,7 +2165,7 @@ function goToBookshelf() {
 }
 
 .reader-catalog__list {
-  scrollbar-width: thin;
+  scrollbar-width: auto;
 }
 
 .reader-page--light .reader-catalog__list {
@@ -2141,7 +2177,17 @@ function goToBookshelf() {
 }
 
 .reader-catalog__list::-webkit-scrollbar {
-  width: 6px;
+  width: 14px;
+}
+
+.reader-catalog__list::-webkit-scrollbar-thumb:vertical {
+  min-height: 48px;
+}
+
+@media (hover: none) {
+  .reader-catalog__list::-webkit-scrollbar {
+    width: 16px;
+  }
 }
 
 .reader-catalog__list::-webkit-scrollbar-track {
@@ -2191,6 +2237,33 @@ function goToBookshelf() {
 .reader-catalog__item--active {
   border-color: color-mix(in srgb, var(--reader-accent) 28%, transparent);
   background: color-mix(in srgb, var(--reader-accent) 12%, transparent);
+}
+
+.reader-catalog__jump {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--reader-panel-border);
+  border-radius: 16px;
+  background: var(--reader-settings-bg);
+}
+
+.reader-catalog__jump-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.reader-catalog__jump-label span {
+  color: var(--reader-muted);
+  font-size: 13px;
+}
+
+.reader-catalog__jump-label strong {
+  color: var(--reader-heading);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .reader-catalog__index {

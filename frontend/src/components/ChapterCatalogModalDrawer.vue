@@ -275,7 +275,35 @@ function formatChapterOrdinal(index: number) {
 .chapter-catalog-panel__body {
   max-height: min(62vh, 560px);
   overflow: auto;
-  padding-right: 4px;
+  padding-right: 12px;
+  scrollbar-width: auto;
+}
+
+.chapter-catalog-panel__body::-webkit-scrollbar {
+  width: 14px;
+}
+
+.chapter-catalog-panel__body::-webkit-scrollbar-thumb:vertical {
+  min-height: 48px;
+}
+
+@media (hover: none) {
+  .chapter-catalog-panel__body::-webkit-scrollbar {
+    width: 16px;
+  }
+}
+
+.chapter-catalog-panel__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chapter-catalog-panel__body::-webkit-scrollbar-thumb {
+  background: rgba(74, 159, 217, 0.5);
+  border-radius: 999px;
+}
+
+.chapter-catalog-panel__body::-webkit-scrollbar-thumb:hover {
+  background: rgba(74, 159, 217, 0.7);
 }
 
 .chapter-catalog-panel--drawer .chapter-catalog-panel__body {
